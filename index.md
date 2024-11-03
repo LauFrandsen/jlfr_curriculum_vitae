@@ -5,8 +5,8 @@ title: Jonas Lau Frandsen's CV
 # Jonas Lau Frandsen
 Datascience, Software-developer
 <div id="webaddress">
-<a href="color@laufrandsen.dk">color@laufrandsen.dk</a>
-| <a href="www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | +45 41 66 77 26
+<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a>
+| <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
 </div>
 
 
