@@ -1,91 +1,91 @@
 ---
 layout: cv
-title: Isaac Newtons's CV
+title: Jonas Lau Frandsen's CV
 ---
-# Isaac Newton
-Physicist, Mathematician, Cambridge professor.
-
+# Jonas Lau Frandsen
+Datascience, Software-developer
 <div id="webaddress">
-<a href="isaac@applesdofall.org">isaac@applesdofall.org</a>
-| <a href="http://en.wikipedia.org/wiki/Isaac_Newton">My wikipedia page</a>
+<a href="color@laufrandsen.dk">color@laufrandsen.dk</a>
+| <a href="www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | +45 41 66 77 26
 </div>
 
 
 ## Currently
 
-Standing on the shoulders of giants
+Working as a Data Consultant at [Netcompany](https://netcompany.com/)
 
 ### Specialized in
 
-Laws of motion, gravitation, minting coins, disliking [Robert Hooke](http://en.wikipedia.org/wiki/Robert_Hooke)
+Data Science, Machine Learning, AI, Software Development and Data Visualization
+
+### Professional Profile
+
+Passionate and results-driven data scientist with a strong background in software development and data science. With over one year of experience as a data consultant, I have demonstrated the ability to lead and implement Proof of Concept projects that assess the potential for larger ML and AI implementations. I thrive in team environments where I can leverage my technical skills and generalist profile to create value and drive projects forward.
+
+## Education and work experience
 
 
-### Research interests
+`2023-Now`
+__Netcompany__
+- Data Consultant
 
-Cooling, power series, optics, alchemy, planetary motions, apples.
+`2021-2023`
+__IT University of Copenhagen__ 
+- Master's degree in Software Design
+- Specialization in AI and deep learning.
+- Electives in Big Data Management and Applied Information Security.
+- Thesis: Searching for open-ended properties in a Large Scale Collective Intelligence system.
+- GPA: 10.13
 
+`2018-2021`
+__University of Copenhagen__ 
 
-## Education
+- Bachelor's degree in Film and Media Sciences.
+- GPA: 10.50
 
-`1654-1660`
-__The King's School, Grantham.__
+## Technical Skills
 
-`June 1661 - now`
-__Trinity College, Cambridge__
+__Programming Languages__ 
+- Python (including NumPy, Pandas, PyTorch, EvoTorch), Java, SQL
 
-- Sizar
+__Data Science and ML__ 
+- Deep Learning, Neuroevolution, Statistical Analysis, MLflow
 
-`1667 - death`
-__Trinity College, Cambridge__
+__Big Data Technologies__ 
+- PySpark, Hadoop File System (HFS), High-Performance Computing (HPC) with Ray
 
-- Fellow
+__Cloud and DevOps__ 
+- Databricks, Cloud deployment of AI models
 
+__Systems__ 
+- Experienced with Linux, Windows, and macOS
 
+__Security__ 
+- Fundamental understanding of penetration testing and information security
 
-## Awards
+## Personal Skills
 
-`2012`
-President, *Royal Society*, London, UK
+__Team Leadership__ 
+- Experience as an interim Team Lead with the ability to motivate and coordinate teams.
 
-Associate, *French Academy of Science*, Paris, France
+__Communication__ 
+- Strong stakeholder management skills; 
+- adept at conveying complex technical topics to non-technical audiences.
 
+__Problem-Solving__ 
+- Analytical thinker with the ability to quickly learn and apply new technologies and methods.
 
+__Adaptability__ 
+- Highly flexible with the ability to adapt to changing project requirements and technologies.
 
-## Publications
+### Languages
 
-<!-- A list is also available [online](http://scholar.google.co.uk/citations?user=LTOTl0YAAAAJ) -->
+__Danish__ 
+- Native Language
 
-### Journals
-
-`1669`
-Newton Sir I, De analysi per æquationes numero terminorum infinitas. 
-
-`1669`
-Lectiones opticæ.
-
-etc. etc. etc.
-
-### Patents
-
-`2012`
-Infinitesimal calculus for solutions to physics problems, [SMBC](http://www.techdirt.com/articles/20121011/09312820678/if-patents-had-been-around-time-newton.shtml) patent 001
-
-
-## Occupation
-
-`1600`
-__Royal Mint__, London
-
-- Warden
-- Minted coins
-
-`1600`
-__Lucasian professor of Mathematics__, Cambridge University
-
+__English__ 
+- Fluent
 
 
-<!-- ### Footer
-
-Last updated: May 2013 -->
 
 
