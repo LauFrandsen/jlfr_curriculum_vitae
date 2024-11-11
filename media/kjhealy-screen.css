@@ -72,14 +72,13 @@ p {
 code {
 	font: normal normal;
 	font-size: 60%;
-	/*line-height: 1em;*/
 	font-family: Menlo,monospace,sans-serif;
 	color: #aaa;
 }
 
 p code {
 	position: absolute;
-	top: -10%;
+	top: 0.2em;
 	left: -14%;
 }
 
@@ -120,12 +119,12 @@ h1,h2,h3,h4 {
 }
 
 h1 {
-	text-align: center;
+	text-align: left;
 	font-size: 3em;
 	line-height: 1em;
 	position: relative;
-	left: 0;
-	width: 100%;
+	left: 33%;
+	width: 65%;
 }
 
 h1+p { 
@@ -133,9 +132,9 @@ h1+p {
 	font-style: italic;
 	margin-top: 0.5em;
 	font-size: 110%;
-	text-align: center;
-	left: 0;
-	width: 100%;
+	text-align: left;
+	left: 33%;
+	width: 65%;
 }
 
 h2 {
@@ -169,12 +168,12 @@ a:hover {
 #webaddress {
 	margin-top: 1em;
 	position: relative;
-	left: 0;
+	left: 33%;
 	color: #aaa;
 	font-family: Menlo,monospace,sans-serif;
 	font-size: 80%;
-	text-align: center;
-	width: 100%;
+	text-align: left;
+	width: 65%;
 }
 
 #webaddress a {
@@ -224,7 +223,8 @@ strong {
   h1, h1 + p, #webaddress {
     width: 100%;
     margin: 0.5em 0;
-    text-align: center;
+    text-align: left;
+    left: 0;
   }
 
   h2, h3 {
@@ -246,6 +246,12 @@ strong {
     margin: 0.3em 0;
     padding-left: 0;
     text-indent: 0;
+  }
+
+  p code {
+    position: static !important;
+    display: block;
+    margin-bottom: 0.3em;
   }
 }
 
