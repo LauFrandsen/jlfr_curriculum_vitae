@@ -28,6 +28,10 @@ Passionate and results-driven data scientist with a strong background in softwar
 `2023-Now`
 __Netcompany__
 - Data Consultant
+- Working with clients to implement data-driven solutions using ML and AI.
+- Leading and implementing Proof of Concept projects that assess the potential for larger ML and AI implementations.
+- Developing and deploying scalable AI models using Databricks and cloud technologies.
+- Helping clients with statistical analysis and data visualization.
 
 `2021-2023`
 __IT University of Copenhagen__ 
