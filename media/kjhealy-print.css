@@ -59,6 +59,22 @@ body {
 	line-height: 1.5em;
 	font-family: Verdana,sans-serif;
 	margin: 1em;
+	height: auto !important;
+}
+
+/* Remove fixed height constraints for print */
+#content, .text-container {
+    min-height: auto !important;
+    height: auto !important;
+}
+
+/* Ensure page breaks don't occur in the middle of sections */
+h2, h3 {
+    page-break-after: avoid;
+}
+
+li {
+    page-break-inside: avoid;
 }
 
 h1,h2,h3,h4 {
