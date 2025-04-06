@@ -25,10 +25,10 @@ Passionate and results-driven data scientist with a strong background in softwar
 
 `Dec 2023-Now`
 __DSB AI predictions for trains__
-- I was part of the team that started the PoC together with DSB to prove that it was possible to provide better predictions for trains in Denmark.
-- We went from PoC to full scale ML production set-up, with a large network of models serving predictions in real time.
-- After original project was finished, I continued our effort first as team lead, and later as project lead to ensure that the project continously provide value for customers.
-- This project has enabled me to utilize my strong generalist profile to work on small scale hypothesis based AI and ML analysis as well as seeing the bigger picture and plotting the road ahead.
+- Led transformation of a proof-of-concept into enterprise-scale ML system delivering real-time train predictions across Denmark
+- Architected and deployed network of production models that improved customer satisfaction and operational efficiency
+- Progressed from team member to team lead and ultimately project lead, ensuring continuous business value delivery
+- Balanced technical implementation with strategic vision, translating complex AI solutions into tangible business outcomes
 
 ## Education and work experience
 
