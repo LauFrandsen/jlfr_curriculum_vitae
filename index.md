@@ -3,12 +3,11 @@ layout: cv
 title: Jonas Lau Frandsen's CV
 ---
 # Jonas Lau Frandsen
-Datascience, Software-development
+Data science, Software-development, Team-leading
 <div id="webaddress">
 <a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a>
 | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
 </div>
-
 
 ## Currently
 
@@ -59,7 +58,9 @@ __University of Copenhagen__
 ## Technical Skills
 
 __Programming Languages__ 
-- Python (Strong background with in depth knowledge about using Python for large scale projects as well as low-level technical analysis), Java, SQL
+- Python - Incredibly strong background for both low-level and high-level programming.
+- Java
+- SQL
 
 __Data Science and ML__ 
 - Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, MLflow
