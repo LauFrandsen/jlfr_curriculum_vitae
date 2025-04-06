@@ -19,7 +19,7 @@ Data Science, Team-leading, Machine Learning, AI, Software Development and Data 
 
 ### Professional Profile
 
-Passionate and results-driven data scientist with a strong background in software development and data science. With my work as both a Data Scientist and team-lead on the DSB x Netcompany project on implementing AI-predictions for the danish trains I have demonstrated the ability to lead and implement Proof of Concept projects that turn into large scale ML projects that provide value for businesses. I thrive in team environments where I can leverage my technical skills and generalist profile to create value and drive projects forward. I do not sit idle by, and take action when needed.
+Passionate and results-driven data scientist with a strong background in software development and data science. With my work as both a Data Scientist and team-lead on a DSB x Netcompany project on implementing AI-predictions for the danish trains I have demonstrated the ability to lead and implement Proof of Concept projects that turn into large scale ML projects that provide value for businesses. I thrive in team environments where I can leverage my technical skills and generalist profile to create value and drive projects forward. I do not sit idle by, and take action when needed.
 
 ## Highlighted project
 
@@ -35,7 +35,7 @@ __DSB AI predictions for trains__
 `2023-Now`
 __Netcompany__
 - Data Consultant
-- Core role at the DSB x Netcompany project on AI predictions for train travel.
+- Core role at a DSB x Netcompany project on AI predictions for train travel.
 - Working with clients to implement data-driven solutions using ML and AI.
 - Leading and implementing Proof of Concept projects that assess the potential for larger ML and AI implementations.
 - Developing and deploying scalable AI models using Databricks and cloud technologies.
