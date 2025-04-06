@@ -266,6 +266,12 @@ strong {
 
 	#particles-js {
 		opacity: 0.3;
+		position: fixed !important;
+		top: 0 !important;
+		left: 0 !important;
+		height: 100% !important;
+		width: 100% !important;
+		z-index: -1 !important;
 	}
 
 	h1, h1 + p, #webaddress, h2, h3, p, ul {
@@ -276,15 +282,54 @@ strong {
 		text-align: left !important;
 	}
 
+	/* Add more space between sections */
+	h2, h3 {
+		margin-top: 2em !important;
+		margin-bottom: 1em !important;
+		padding-top: 0.5em !important;
+		border-top: 1px solid #eee !important;
+	}
+
+	/* Increase spacing after paragraphs */
+	p {
+		margin-bottom: 1em !important;
+	}
+
 	h1 {
 		font-size: 2em;
 		margin-top: 0.5em !important;
+		margin-bottom: 1em !important;
 	}
 
+	/* Add space after lists */
+	ul {
+		margin-bottom: 1.5em !important;
+	}
+
+	/* Style list items with red boxes */
 	li {
 		margin: 0.3em 0;
-		padding-left: 1em;
-		text-indent: -1em;
+		padding-left: 1.5em;
+		text-indent: -1.5em;
+		position: relative !important;
+	}
+	
+	li:before {
+		content: "";
+		display: inline-block !important;
+		position: relative !important;
+		width: 8px !important;
+		height: 8px !important;
+		background-color: #a00 !important; /* Red box color matching h2 color */
+		margin-right: 0.7em !important;
+		vertical-align: middle !important;
+	}
+	
+	/* Adjust nested lists */
+	li li:before {
+		width: 6px !important;
+		height: 6px !important;
+		background-color: rgba(170, 0, 0, 0.7) !important; /* Lighter red for nested items */
 	}
 
 	p code {
@@ -296,12 +341,12 @@ strong {
 
 /* Even smaller screens */
 @media screen and (max-width: 480px) {
-	body {
-		margin: 0.5em;
-		font-size: 100%;
-	}
+  body {
+    margin: 0.5em;
+    font-size: 100%;
+  }
 
-	.text-container {
-		padding: 0.3em;
-	}
+  .text-container {
+    padding: 0.3em;
+  }
 }
