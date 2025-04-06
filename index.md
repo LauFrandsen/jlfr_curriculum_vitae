@@ -12,22 +12,31 @@ Datascience, Software-development
 
 ## Currently
 
-Working as a Data Consultant at [Netcompany](https://netcompany.com/)
+Working as a Data-science Consultant at [Netcompany](https://netcompany.com/)
 
 ### Specialized in
 
-Data Science, Machine Learning, AI, Software Development and Data Visualization
+Data Science, Team-leading, Machine Learning, AI, Software Development and Data Visualization
 
 ### Professional Profile
 
-Passionate and results-driven data scientist with a strong background in software development and data science. With over one year of experience as a data consultant, I have demonstrated the ability to lead and implement Proof of Concept projects that assess the potential for larger ML and AI implementations. I thrive in team environments where I can leverage my technical skills and generalist profile to create value and drive projects forward.
+Passionate and results-driven data scientist with a strong background in software development and data science. With my work as both a Data Scientist and team-lead on the DSB x Netcompany project on implementing AI-predictions for the danish trains I have demonstrated the ability to lead and implement Proof of Concept projects that turn into large scale ML projects that provide value for businesses. I thrive in team environments where I can leverage my technical skills and generalist profile to create value and drive projects forward. I do not sit idle by, and take action when needed.
+
+## Highlighted project
+
+`Dec 2023-Now`
+__DSB AI predictions for trains__
+- I was part of the team that started the PoC together with DSB to prove that it was possible to provide better predictions for trains in Denmark.
+- We went from PoC to full scale ML production set-up, with a large network of models serving predictions in real time.
+- After original project was finished, I continued our effort first as team lead, and later as project lead to ensure that the project continously provide value for customers.
+- This project has enabled me to utilize my strong generalist profile to work on small scale hypothesis based AI and ML analysis as well as seeing the bigger picture and plotting the road ahead.
 
 ## Education and work experience
-
 
 `2023-Now`
 __Netcompany__
 - Data Consultant
+- Core role at the DSB x Netcompany project on AI predictions for train travel.
 - Working with clients to implement data-driven solutions using ML and AI.
 - Leading and implementing Proof of Concept projects that assess the potential for larger ML and AI implementations.
 - Developing and deploying scalable AI models using Databricks and cloud technologies.
@@ -50,16 +59,16 @@ __University of Copenhagen__
 ## Technical Skills
 
 __Programming Languages__ 
-- Python (including NumPy, Pandas, PyTorch, EvoTorch), Java, SQL
+- Python (Strong background with in depth knowledge about using Python for large scale projects as well as low-level technical analysis), Java, SQL
 
 __Data Science and ML__ 
-- Deep Learning, Neuroevolution, Statistical Analysis, MLflow
+- Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, MLflow
 
 __Big Data Technologies__ 
 - PySpark, Hadoop File System (HFS), High-Performance Computing (HPC) with Ray
 
 __Cloud and DevOps__ 
-- Databricks, Cloud deployment of AI models
+- Databricks, Cloud deployment of AI models, MLOps, ModelMesh, AI Health Monitoring set-ups
 
 __Systems__ 
 - Experienced with Linux, Windows, and macOS
@@ -70,11 +79,13 @@ __Security__
 ## Personal Skills
 
 __Team Leadership__ 
-- Experience as an interim Team Lead with the ability to motivate and coordinate teams.
+- Experience as Team Lead with the ability to motivate and coordinate teams.
+- Experience as Project lead with understanding of project planning, team management and succesfull deliveries.
 
 __Communication__ 
-- Strong stakeholder management skills; 
-- adept at conveying complex technical topics to non-technical audiences.
+- Strong stakeholder management skills.
+- Adept at conveying complex technical topics to non-technical audiences.
+- Mastery of presenting for medium to large audiences on complex matters in an understandable way.
 
 __Problem-Solving__ 
 - Analytical thinker with the ability to quickly learn and apply new technologies and methods.
@@ -89,6 +100,9 @@ __Danish__
 
 __English__ 
 - Fluent
+
+__Swedish and Norwegian__
+- Conversation level
 
 
 
