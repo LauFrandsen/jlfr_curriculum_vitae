@@ -11,7 +11,7 @@ Data science, Software-development, Team-leading
 
 ## Currently
 
-Working as a Data-science Consultant at [Netcompany](https://netcompany.com/)
+Working as a Data-science Consultant at [Netcompany](https://netcompany.com/) with documented experience in scaling AI projects from Proof of Concept to production.
 
 ### Specialized in
 
