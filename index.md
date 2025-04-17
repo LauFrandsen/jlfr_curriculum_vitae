@@ -29,7 +29,7 @@ I thrive in collaborative team environments, leveraging my strong technical expe
 
 `Dec 2023-Now`
 __DSB AI predictions for trains__
-- Led transformation of a proof-of-concept into enterprise-scale ML system delivering real-time train predictions across Denmark
+- Led transformation of a Proof of Concept into enterprise-scale ML system delivering real-time train predictions across Denmark
 - Architected and deployed network of production models that improved customer satisfaction and operational efficiency
 - Progressed from team member to team lead and ultimately project lead, ensuring continuous business value delivery
 - Balanced technical implementation with strategic vision, translating complex AI solutions into tangible business outcomes
