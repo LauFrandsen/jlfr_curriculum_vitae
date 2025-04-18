@@ -5,8 +5,8 @@ title: Jonas Lau Frandsen's CV
 # Jonas Lau Frandsen
 Data science, Software-development, Team-leading
 <div id="webaddress">
-<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a>
-| <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
+<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
+<span class="print-only"><br><a href="https://laufrandsen.github.io/jlfr_curriculum_vitae/">Viewing in PDF? See webpage for better formatting</a></span>
 </div>
 
 ## Currently
@@ -38,7 +38,7 @@ __DSB AI predictions for trains__
 
 `2023-Now`
 __Netcompany__
-- Data Consultant
+- *Data Consultant*
 - Core role at a DSB x Netcompany project on AI predictions for train travel.
 - Working with clients to implement data-driven solutions using ML and AI.
 - Leading and implementing Proof of Concept projects that assess the potential for larger ML and AI implementations.
@@ -47,7 +47,7 @@ __Netcompany__
 
 `2021-2023`
 __IT University of Copenhagen__ 
-- Master's degree in Software Design
+- *Master's degree in Software Design*
 - Specialization in AI and deep learning.
 - Electives in Big Data Management and Applied Information Security.
 - Thesis: Searching for open-ended properties in a Large Scale Collective Intelligence system.
@@ -55,8 +55,7 @@ __IT University of Copenhagen__
 
 `2018-2021`
 __University of Copenhagen__ 
-
-- Bachelor's degree in Film and Media Sciences.
+- *Bachelor's degree in Film and Media Sciences.*
 - GPA: 10.50
 
 ## Technical Skills
@@ -106,8 +105,9 @@ __Danish__
 __English__ 
 - Fluent
 
-__Swedish and Norwegian__
-- Conversation level
+<div class="print-only">
+This CV was printed from my online portfolio. For the most up-to-date version, please visit my website.
+</div>
 
 
 
