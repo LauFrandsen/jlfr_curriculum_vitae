@@ -154,7 +154,7 @@ li {
 #webaddress .print-only a {
 	color: #aaa;
 	text-decoration: underline;
-	font-size: 70%;
+	font-size: 100%;
 	display: inline;
 }
 
