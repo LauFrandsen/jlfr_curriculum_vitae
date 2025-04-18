@@ -21,13 +21,15 @@ Data Science, Team-leading, Machine Learning, AI, Software Development and Data 
 
 Passionate and results-driven data scientist with a solid background in software development and data science. In my role as both a Data Scientist and Team Lead on a DSB x Netcompany project, I successfully led the development and implementation of AI-driven predictions for Danish trains, a solution with customers in all of Denmark. This experience has equipped me with the ability to manage Proof of Concept projects and scale them into impactful machine learning solutions that deliver tangible business value, through productionalized models.
 
+I have worked with both traditional ML such as predictive maintenance, data clustering, classifiers, timeseries prediction and regression, as well as Deep Learning, where my expertise area has been computer vision. I have general knowledge about LLM's. 
+
 I thrive in collaborative team environments, leveraging my strong technical expertise and versatile skill set to drive projects forward effectively. I'm proactive by nature, always taking initiative to ensure goals are met and obstacles are addressed promptly.
 
 ## Highlighted project
 
 `Dec 2023-Now`
 __DSB AI predictions for trains__
-- Led transformation of a proof-of-concept into enterprise-scale ML system delivering real-time train predictions across Denmark
+- Led transformation of a Proof of Concept into enterprise-scale ML system delivering real-time train predictions across Denmark
 - Architected and deployed network of production models that improved customer satisfaction and operational efficiency
 - Progressed from team member to team lead and ultimately project lead, ensuring continuous business value delivery
 - Balanced technical implementation with strategic vision, translating complex AI solutions into tangible business outcomes
@@ -65,19 +67,19 @@ __Programming Languages__
 - SQL
 
 __Data Science and ML__ 
-- Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, MLflow
+- Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, Mlflow.
 
 __Big Data Technologies__ 
-- PySpark, Hadoop File System (HFS), High-Performance Computing (HPC) with Ray
+- PySpark, Hadoop File System (HFS), High-Performance Computing (HPC) with Ray as multiprocess enabler.
 
-__Cloud and DevOps__ 
-- Databricks, Cloud deployment of AI models, MLOps, ModelMesh, AI Health Monitoring set-ups
+__Cloud and MlOps__ 
+- Databricks, Cloud deployment of AI models, MLOps, ModelMesh, AI Health Monitoring set-ups, Virtual machines mainly on Azure platforms.
 
 __Systems__ 
 - Experienced with Linux, Windows, and macOS
 
 __Security__ 
-- Fundamental understanding of penetration testing and information security
+- Fundamental understanding of information security and why it is important. 
 
 ## Personal Skills
 
@@ -94,7 +96,7 @@ __Problem-Solving__
 - Analytical thinker with the ability to quickly learn and apply new technologies and methods.
 
 __Adaptability__ 
-- Highly flexible with the ability to adapt to changing project requirements and technologies.
+- Highly flexible with the ability to adapt to changing project requirements, technologies and the organisation around projects.
 
 ### Languages
 
