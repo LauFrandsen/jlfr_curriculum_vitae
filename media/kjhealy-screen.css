@@ -207,18 +207,19 @@ body.dark-mode .dark-mode-toggle .icon-sun {
 .nav-menu {
 	position: fixed;
 	top: 0;
-	right: -300px;
+	right: 0;
 	width: 280px;
 	height: 100vh;
 	background: var(--nav-bg);
 	z-index: 999;
 	box-shadow: -4px 0 20px var(--shadow-color);
-	transition: right 0.3s ease;
+	transform: translateX(100%);
+	transition: transform 0.3s ease;
 	overflow-y: auto;
 }
 
 .nav-menu.open {
-	right: 0;
+	transform: translateX(0);
 }
 
 .nav-header {
@@ -694,176 +695,290 @@ ul.entry-details li.responsibility-item::before {
 
 /* ===== MOBILE RESPONSIVE ===== */
 @media screen and (max-width: 768px) {
-	* {
-		position: static !important;
-		float: none !important;
-	}
-
+	/* Reset layout positioning for mobile - be selective, not universal */
 	body {
 		margin: 0;
-		padding: 1em;
-		font-size: 90%;
+		padding: 0;
+		font-size: 16px;
 		-webkit-text-size-adjust: 100%;
 	}
 
-	.text-container {
-		width: 100%;
-		padding: 0.5em;
-		padding-top: 4em;
-		margin: 0;
-		background: var(--card-bg-solid);
-	}
-
+	/* Particles background - subtle but visible */
 	#particles-js {
-		opacity: 0.3 !important;
 		position: fixed !important;
 		top: 0 !important;
 		left: 0 !important;
+		width: 100% !important;
 		height: 100% !important;
-		width: 100% !important;
-		z-index: -1 !important;
+		z-index: 0 !important;
+		opacity: 0.5;
 	}
 
+	/* Main content container - clean, no glassy effect */
 	.text-container {
-		background: linear-gradient(
-			to right,
-			rgba(255, 255, 255, 0.2) 0%,
-			var(--card-bg-solid) 30%,
-			var(--card-bg-solid) 70%,
-			rgba(255, 255, 255, 0.2) 100%
-		) !important;
-		box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.5) !important;
-		border-radius: 4px !important;
-		margin: 0.5em !important;
-		width: calc(100% - 1em) !important;
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		max-width: 100%;
+		padding: 1em;
+		padding-top: 4em;
+		margin: 0;
+		background: var(--card-bg);
+		box-shadow: none;
+		border-radius: 0;
 	}
 
-	p, li, h1, h2, h3, #webaddress {
-		text-shadow: 0 0 4px var(--bg-color), 0 0 8px var(--bg-color), 0 0 12px var(--bg-color) !important;
+	/* Controls stay fixed at top */
+	.controls-container {
+		position: fixed !important;
+		top: 0.5em;
+		right: 0.5em;
+		z-index: 1001 !important;
 	}
 
-	h1, h1 + p, #webaddress, h2, h3, p, ul {
-		width: 100% !important;
-		margin: 0.5em 0 !important;
-		padding: 0 0.5em !important;
+	.control-btn {
+		width: 44px;
+		height: 44px;
+		font-size: 1.2em;
+	}
+
+	/* Navigation menu - use transform for smooth animation */
+	.nav-menu {
+		position: fixed !important;
+		top: 0 !important;
+		right: 0 !important;
+		width: 280px;
+		height: 100vh;
+		transform: translateX(100%);
+		transition: transform 0.3s ease;
+		z-index: 1000 !important;
+	}
+
+	.nav-menu.open {
+		transform: translateX(0);
+	}
+
+	/* Typography - single column layout */
+	h1, h1 + p, #webaddress, p, ul {
+		position: static !important;
 		left: 0 !important;
+		width: 100% !important;
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+		padding: 0 0.5em !important;
 		text-align: left !important;
 	}
 
-	h2, h3 {
-		margin-top: 2em !important;
-		margin-bottom: 1em !important;
-		padding-top: 0.5em !important;
+	h1 {
+		font-size: 1.8em !important;
+		margin-top: 0.5em !important;
+		margin-bottom: 0.5em !important;
+	}
+
+	h2 {
+		position: static !important;
+		top: auto !important;
+		left: 0 !important;
+		width: 100% !important;
+		text-align: left !important;
+		justify-content: flex-start !important;
+		margin-top: 1.5em !important;
+		margin-bottom: 0.8em !important;
+		padding-top: 0.8em !important;
+		padding-left: 0.5em !important;
+		padding-right: 0.5em !important;
 		border-top: 1px solid var(--border-color) !important;
 	}
 
-	p {
-		margin-bottom: 1em !important;
+	h3 {
+		position: static !important;
+		top: auto !important;
+		left: 0 !important;
+		width: 100% !important;
+		text-align: left !important;
+		margin-top: 1.2em !important;
+		margin-bottom: 0.5em !important;
+		padding-left: 0.5em !important;
 	}
 
-	h1 {
-		font-size: 2em;
-		margin-top: 0.5em !important;
-		margin-bottom: 1em !important;
+	p {
+		margin-bottom: 0.8em;
+		line-height: 1.5;
 	}
 
 	ul {
-		margin-bottom: 1.5em !important;
+		margin-bottom: 1em;
 	}
 
 	li {
-		margin: 0.3em 0;
-		padding-left: 1.5em;
-		text-indent: -1.5em;
-		position: relative !important;
+		margin: 0.4em 0;
+		padding-left: 0;
+		text-indent: 0;
+		line-height: 1.4;
 	}
 
-	li:before {
-		content: "";
-		display: inline-block !important;
-		position: relative !important;
-		width: 8px !important;
-		height: 8px !important;
-		background-color: var(--heading-color) !important;
-		margin-right: 0.7em !important;
-		vertical-align: middle !important;
+	li::before {
+		content: "› ";
+		color: var(--heading-color);
+		font-weight: bold;
 	}
 
-	li li:before {
-		width: 6px !important;
-		height: 6px !important;
-		opacity: 0.7;
-	}
-
+	/* Date codes inline on mobile */
 	p code,
 	code.date-code {
-		float: none !important;
 		display: inline;
-		margin-bottom: 0.3em;
 		margin-left: 0.5em;
 	}
 
-	/* Mobile nav and controls */
-	.controls-container {
-		top: 0.5em;
-		right: 0.5em;
+	/* Skill tags */
+	.skill-tags {
+		position: static;
+		left: 0;
+		width: 100%;
+		padding: 0;
+		margin: 0.5em 0;
+	}
+
+	/* Entry styling */
+	.entry-header {
+		margin-top: 1em;
+		padding-top: 0.5em;
+	}
+
+	ul.entry-details {
+		position: static;
+		left: 0;
+		width: 100%;
+		margin-left: 0;
+		padding-left: 0;
+	}
+
+	ul.entry-details li {
+		padding-left: 0;
+	}
+
+	/* Specialization tags */
+	.specialization-inline {
+		gap: 6px;
+	}
+
+	.spec-tag {
+		padding: 4px 8px;
+		font-size: 0.85em;
+	}
+
+	/* Career timeline - single column */
+	.career-timeline {
+		margin-left: 3em !important;
+		width: calc(100% - 3.5em) !important;
+		padding-left: 1em !important;
+	}
+
+	.career-timeline::before {
+		left: 0 !important;
+	}
+
+	.position-marker {
+		left: -1em !important;
+	}
+
+	.timeline-company,
+	.position-content {
+		width: 100% !important;
+	}
+
+	/* Position details - more padding from timeline */
+	ul.position-details {
+		padding-left: 0.8em !important;
+		margin-left: 0 !important;
+	}
+
+	ul.position-details li {
+		padding-left: 0 !important;
+	}
+
+	/* Date rotated 90 degrees along the red line - on the LEFT side, ending at circle */
+	.position-header {
+		position: relative !important;
+	}
+
+	.position-header .date-code {
+		position: absolute !important;
+		left: -3.5em !important;
+		top: 0.2em !important;
+		transform: rotate(-90deg) translateX(-100%) !important;
+		transform-origin: left top !important;
+		background: transparent !important;
+		padding: 0 !important;
+		font-size: 0.75em !important;
+		white-space: nowrap !important;
+		color: var(--code-color) !important;
+	}
+
+	/* Previous experience */
+	.previous-experience {
+		margin-left: 0;
+		width: 100%;
+		padding: 0 0.5em;
+	}
+
+	/* Collapsible content */
+	.collapsible-content {
+		width: 100%;
+	}
+
+	.collapsible-content > .entry-header:first-of-type {
+		margin-top: 0;
+	}
+
+	/* Language tags */
+	.languages-container {
+		position: static !important;
+		left: 0 !important;
+		width: 100% !important;
+		padding: 0 0.5em !important;
+	}
+
+	/* Footer */
+	.site-footer {
+		position: static;
+		left: 0;
+		transform: none;
+		width: 100%;
+		padding: 1em;
+		text-align: center;
+	}
+}
+
+/* Smaller phones */
+@media screen and (max-width: 480px) {
+	body {
+		font-size: 15px;
+	}
+
+	.text-container {
+		padding: 0.5em;
+		padding-top: 3.5em;
+	}
+
+	h1 {
+		font-size: 1.5em;
 	}
 
 	.control-btn {
 		width: 40px;
 		height: 40px;
+		font-size: 1.1em;
 	}
 
 	.nav-menu {
 		width: 100%;
-		right: -100%;
 	}
 
-	/* Mobile skill tags */
-	.skill-tags {
-		left: 0 !important;
-		width: 100% !important;
-		padding: 0 0.5em !important;
-	}
-
-	/* Mobile entry styling */
-	ul.entry-details {
-		margin-left: 0 !important;
-		width: 100% !important;
-		padding-left: 0.8em !important;
-	}
-
-	.entry-header {
-		padding-top: 0.8em !important;
-		margin-top: 1em !important;
-	}
-
-	/* Mobile specialization tags */
-	.specialization-inline {
-		gap: 4px;
-	}
-
-	.spec-tag {
-		padding: 2px 6px;
-		font-size: 0.75em;
-	}
-}
-
-@media screen and (max-width: 480px) {
-	body {
-		margin: 0.5em;
-		font-size: 100%;
-	}
-
-	.text-container {
-		padding: 0.3em;
-		padding-top: 3.5em;
-	}
-
-	.control-btn {
-		width: 36px;
-		height: 36px;
-		font-size: 1em;
+	.spec-tag,
+	.skill-tag {
+		padding: 3px 6px;
+		font-size: 0.8em;
 	}
 }
 
@@ -1056,37 +1171,6 @@ ul.position-details li::before {
 	border-radius: 3px;
 }
 
-/* Mobile responsive timeline */
-@media screen and (max-width: 768px) {
-	.career-timeline {
-		margin-left: 0 !important;
-		width: 100% !important;
-		padding-left: 1.2em !important;
-	}
-
-	.career-timeline::before {
-		left: 0 !important;
-	}
-
-	.position-marker {
-		left: -1.2em !important;
-	}
-
-	.previous-experience {
-		margin-left: 0 !important;
-		width: 100% !important;
-	}
-
-	/* On mobile, put date back inline */
-	.position-header .date-code {
-		position: static !important;
-		transform: none !important;
-		margin-left: 0.5em !important;
-		background: var(--skill-tag-bg) !important;
-		padding: 2px 8px !important;
-		border-radius: 3px !important;
-	}
-}
 
 /* ===== ANIMATIONS ===== */
 @keyframes fadeIn {

@@ -1,2 +1,6 @@
 markdown: kramdown
 style: kjhealy
+
+# GitHub Pages settings
+baseurl: /jlfr_curriculum_vitae
+url: https://laufrandsen.github.io
