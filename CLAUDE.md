@@ -1,45 +1,74 @@
-# CV Project Documentation
+# Jonas Lau Frandsen's CV - Project Documentation
 
 ## Overview
 
-A minimal Jekyll-based CV/resume that renders beautifully both on the web and when printed to PDF. Uses pure CSS (no JavaScript) with separate stylesheets for screen and print media.
+A Jekyll-based CV/resume featuring an interactive particles.js background animation for the web view, with a clean print-optimized layout for PDF generation. The two-column design places dates on the left and content on the right.
 
 ## Project Structure
 
 ```
 jlfr_curriculum_vitae/
-├── _config.yml           # Jekyll config (markdown engine, theme selection)
-├── _layouts/cv.html      # Main HTML template
-├── index.md              # CV content in Markdown with YAML frontmatter
-├── media/                # CSS stylesheets
-│   ├── kjhealy-screen.css   # Default theme - web view
-│   ├── kjhealy-print.css    # Default theme - print view
-│   ├── davewhipp-screen.css # Alternate theme - web view
-│   └── davewhipp-print.css  # Alternate theme - print view
-├── README.md             # User-facing documentation
-└── LICENSE               # MIT License
+├── _config.yml              # Jekyll config (markdown engine, theme)
+├── _layouts/cv.html         # Main HTML template with particles.js integration
+├── index.md                 # CV content in Markdown
+├── media/                   # CSS stylesheets
+│   ├── kjhealy-screen.css   # Web view styles (active)
+│   ├── kjhealy-print.css    # Print/PDF styles (active)
+│   ├── davewhipp-*.css      # Alternate theme (unused)
+├── js/
+│   ├── particles.js         # Particles library (local copy)
+│   └── particles_config.js  # Particle animation configuration
+├── README.md
+└── LICENSE
 ```
 
-## How It Works
+## Architecture
 
 ### Theme System
-- `_config.yml` sets `style: kjhealy` (or `davewhipp`)
-- Layout template dynamically loads `media/{{ site.style }}-screen.css` and `-print.css`
-- Browser applies correct stylesheet based on media type
+- `style: kjhealy` in `_config.yml` selects the active theme
+- Layout loads `media/{style}-screen.css` for web and `media/{style}-print.css` for printing
+- Browser automatically applies correct stylesheet via CSS media queries
 
 ### Two-Column Layout
-- Dates/codes wrapped in backticks (`) appear in left column
-- Main content appears in right column (33% margin on screen, 28% on print)
-- Achieved via CSS positioning, not flexbox/grid
+- Dates wrapped in backticks (`` `2023-Now` ``) render in the left column
+- Content flows in the right column (33% margin on screen, 25% on print)
+- Section headers (h2) right-aligned in left column, colored red (#a00)
 
-### Markdown Conventions
-- `# Name` - Main heading (your name)
-- `## Section` - Section headers (Education, Experience, etc.)
-- `### Subsection` - Category headers within sections
-- `` `1999-2005` `` - Date ranges (rendered in left column)
-- `__Bold__` or `**Bold**` - Institution/company names
-- `*Italic*` - Publication titles, awards
-- `<div id="webaddress">` - Contact info block
+### Particles.js Integration
+- CDN script in `<head>`, config loaded at end of `<body>`
+- Fixed position canvas behind content (`z-index: 0`)
+- Content has semi-transparent gradient background for readability
+- Interactive: particles repulse on hover, new particles on click
+- Hidden in print via `display: none !important`
+
+### Print vs Screen
+| Feature | Screen | Print |
+|---------|--------|-------|
+| Particles | Visible, interactive | Hidden |
+| Font size | 80% | 70% |
+| Layout | Position-based | Float-based |
+| `.print-only` | Hidden | Visible |
+| Footer | Visible | Hidden |
+| Date codes | Gray (#aaa) | Black |
+
+### Mobile Responsiveness
+- Breakpoint at 768px: Single column, static positioning
+- Breakpoint at 480px: Further padding/margin adjustments
+- Particles fade to 30% opacity on mobile
+- Text gets white shadow for readability
+
+## Markdown Conventions
+
+```markdown
+# Name                          → Main heading
+## Section                      → Red section headers (Education, Skills)
+### Subsection                  → Sub-categories (Languages)
+`2023-Now`                      → Date range in left column
+__Company Name__                → Bold institution/company
+*Role Title*                    → Italic role/position
+- Bullet point                  → List item
+<div class="print-only">        → Content only visible when printing
+```
 
 ## Development
 
@@ -52,56 +81,36 @@ jekyll serve
 # Visit http://localhost:4000
 
 # Generate PDF
-# Open in browser, press Ctrl+P / Cmd+P, "Save as PDF"
+# Open in browser → Ctrl+P/Cmd+P → Save as PDF
 ```
 
-## CSS Architecture
+## Current Issues
 
-Both themes include:
-1. Meyer Reset v2.0 (lines 1-48)
-2. Body typography and margins
-3. Two-column positioning for p, ul, h1-h4
-4. Code styling for date labels
-5. Link and emphasis styles
-6. Hidden elements (#address, #ghbutton)
-
-### Key Differences: Screen vs Print
-| Property | Screen | Print |
-|----------|--------|-------|
-| Font size | 80% | 10pt |
-| Left margin | 33% | 28% |
-| Line height | 1.5em | 1.35em |
-| Code color | #aaa | #ccc |
-| Link underlines | on hover | none |
-
-## Known Issues / Cleanup Needed
-
-1. **Typo in index.md**: "Isaac Newtons's CV" (extra 's')
-2. **Inconsistent selectors**: Screen CSS hides `#address`, print CSS hides `#ghbutton`
-3. **Duplicated CSS reset**: Same ~50 lines repeated in all 4 CSS files
-4. **No viewport meta**: Layout not responsive on mobile
-5. **Missing charset in config**: Should specify UTF-8 encoding
-6. **Trailing whitespace**: Extra blank lines at end of index.md
+1. **Duplicated CSS**: Particles and container styles in both layout HTML and screen CSS
+2. **Trailing whitespace**: Empty lines at end of index.md
+3. **Typo**: "succesfull" → "successful" in Personal Skills section
+4. **Inconsistent config formatting**: Mixed spacing around colons in _config.yml
+5. **Unused theme files**: davewhipp-*.css files not used but still present
 
 ## Improvement Ideas
 
 ### Print/PDF Enhancements
-- Add page break controls (`page-break-before`, `page-break-inside`)
-- Improve date alignment consistency
-- Add proper PDF metadata (title, author)
-- Consider A4 vs Letter sizing
+- Better page break control for multi-page CVs
+- Consistent date alignment across sections
+- Optimized margins for A4/Letter paper
+- PDF metadata (title, author) via `<meta>` tags
 
 ### Web Interactivity
-- Add dark mode toggle
-- Smooth scroll navigation
-- Collapsible sections
-- Skills visualization (progress bars, tags)
-- Timeline view for experience
-- Mobile responsive breakpoints
-- Print button with preview
+- Dark mode toggle with particle color inversion
+- Smooth scroll navigation between sections
+- Collapsible sections for long content
+- Skills visualization (progress bars, tag clouds)
+- Timeline component for experience
+- Print preview button
 
 ### Code Quality
-- Extract CSS reset to shared file
-- Convert to SASS for variables/mixins
-- Add CSS custom properties for theming
-- Minify CSS for production
+- Extract shared CSS reset to separate file
+- Convert to SASS for variables and mixins
+- Remove duplicate styles between layout and CSS
+- CSS custom properties for theming
+- Minification for production

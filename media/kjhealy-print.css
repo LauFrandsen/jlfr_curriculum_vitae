@@ -1,4 +1,4 @@
-/* http://meyerweb.com/eric/tools/css/reset/ 
+/* http://meyerweb.com/eric/tools/css/reset/
    v2.0 | 20110126
    License: none (public domain)
 */
@@ -12,8 +12,8 @@ b, u, i, center,
 dl, dt, dd, ol, ul, li,
 fieldset, form, label, legend,
 table, caption, tbody, tfoot, thead, tr, th, td,
-article, aside, canvas, details, embed, 
-figure, figcaption, footer, header, hgroup, 
+article, aside, canvas, details, embed,
+figure, figcaption, footer, header, hgroup,
 menu, nav, output, ruby, section, summary,
 time, mark, audio, video {
 	margin: 0;
@@ -23,25 +23,31 @@ time, mark, audio, video {
 	font: inherit;
 	vertical-align: baseline;
 }
+
 /* HTML5 display-role reset for older browsers */
-article, aside, details, figcaption, figure, 
+article, aside, details, figcaption, figure,
 footer, header, hgroup, menu, nav, section {
 	display: block;
 }
+
 body {
 	line-height: 1;
 }
+
 ol, ul {
 	list-style: none;
 }
+
 blockquote, q {
 	quotes: none;
 }
+
 blockquote:before, blockquote:after,
 q:before, q:after {
 	content: '';
 	content: none;
 }
+
 table {
 	border-collapse: collapse;
 	border-spacing: 0;
@@ -49,102 +55,143 @@ table {
 
 /* end of reset */
 
-#particles-js {
-    display: none !important;
+/* ===== PRINT SPECIFIC STYLES ===== */
+
+/* Page setup for A4/Letter compatibility */
+@page {
+	size: A4;
+	margin: 12mm 10mm 12mm 10mm;
+}
+
+/* Hide interactive elements */
+#particles-js,
+.controls-container,
+.nav-menu,
+.dark-mode-toggle,
+.print-btn,
+.collapse-toggle,
+.timeline-toggle,
+footer,
+.site-footer {
+	display: none !important;
 }
 
 body {
 	font: normal normal 400;
-	font-size: 70%;
-	line-height: 1.5em;
-	font-family: Verdana,sans-serif;
-	margin: 1em;
+	font-size: 9pt;
+	line-height: 1.4em;
+	font-family: 'Segoe UI', Verdana, sans-serif;
+	margin: 0;
+	padding: 0;
 	height: auto !important;
+	background: white !important;
+	color: #222 !important;
 }
 
 /* Remove fixed height constraints for print */
 #content, .text-container {
-    min-height: auto !important;
-    height: auto !important;
+	min-height: auto !important;
+	height: auto !important;
+	background: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	width: 100% !important;
+	max-width: none !important;
 }
 
-/* Ensure page breaks don't occur in the middle of sections */
+/* ===== PAGE BREAK CONTROLS ===== */
+
+h1, h2, h3, h4, p, li, .skill-item {
+	page-break-inside: avoid;
+	break-inside: avoid;
+}
+
 h2, h3 {
-    page-break-after: avoid;
-}
-
-li {
-    page-break-inside: avoid;
-}
-
-h1,h2,h3,h4 {
-	font-weight: 400;
-	font-family: Cousine,Verdana,sans-serif;
-}
-
-h1 {
-	text-align: left;
-	font-size: 2.5em;
-	line-height: 1em;
-	margin-left: 25%;
-	width: 73%;
-}
-
-h1+p { 
-	/*subtitle*/
-	font-style: italic;
-	font-size: 100%;
-	margin-left: 25%;
-}
-
-.section {
-	clear: both;
-	margin-top: 1em;
+	page-break-after: avoid;
+	break-after: avoid;
 }
 
 h2 {
-	font-size: 1em;
+	page-break-before: auto;
+	break-before: auto;
+}
+
+.entry-header {
+	page-break-inside: avoid;
+}
+
+ul.entry-details {
+	page-break-inside: avoid;
+}
+
+/* Keep first entry with section header */
+.collapsible-content {
+	page-break-before: avoid;
+	break-before: avoid;
+}
+
+.collapsible-content > .entry-header:first-of-type,
+.collapsible-content > .entry-header:first-of-type + ul.entry-details {
+	page-break-before: avoid;
+	break-before: avoid;
+}
+
+/* Keep entry header and its details together */
+.entry-header + ul.entry-details {
+	page-break-before: avoid;
+	break-before: avoid;
+}
+
+/* ===== HEADER ===== */
+
+h1 {
+	font-size: 20pt;
+	font-weight: 700;
+	line-height: 1.1em;
+	margin-bottom: 4pt;
+	color: #000;
+	border-bottom: 2pt solid #a00;
+	padding-bottom: 4pt;
+	font-family: 'Segoe UI', Verdana, sans-serif;
+}
+
+/* Subtitle - roles */
+h1 + p {
+	margin-top: 6pt;
+	margin-bottom: 6pt;
+}
+
+.subtitle-enhanced {
+	font-style: normal !important;
+}
+
+.subtitle-tag {
+	display: inline;
 	color: #a00;
-	width: 20%;
-	float: left;
-	text-align: left;
-	clear: both;
+	font-weight: 600;
+	font-size: 10pt;
 }
 
-h3 {
-	font-size: 0.9em;
-	width: 20%;
-	float: left;
-	text-align: left;
-	clear: both;
+.subtitle-sep {
+	display: inline;
+	margin: 0 4pt;
+	color: #888;
 }
 
-p {
-	margin-left: 25%;
-	width: 73%;
-	margin-bottom: 1.2em;
-	position: relative;
-}
-
-ul { 
-	margin-left: 25%;
-	width: 73%;
-	margin-bottom: 1.5em;
-}
-
-li {
-	padding-left: 1.25em;
-	text-indent: -1.25em;
-	margin-bottom: 0.5em;
-}
+/* ===== CONTACT INFO ===== */
 
 #webaddress {
-	margin-left: 25%;
-	width: 73%;
-	color: #aaa;
-	font-family: Menlo,monospace,sans-serif;
-	font-size: 70%;
-	margin-bottom: 1em;
+	color: #444;
+	font-family: 'Consolas', 'Courier New', monospace;
+	font-size: 8pt;
+	margin-bottom: 10pt;
+	padding-bottom: 6pt;
+	border-bottom: 0.5pt solid #ddd;
+}
+
+#webaddress a {
+	color: #333;
+	text-decoration: none;
 }
 
 #webaddress .print-only {
@@ -152,35 +199,298 @@ li {
 }
 
 #webaddress .print-only a {
-	color: #aaa;
+	color: #666;
 	text-decoration: underline;
-	font-size: 100%;
-	display: inline;
 }
 
-code {
-	font: normal normal;
-	font-size: 60%;
-	font-family: Menlo,monospace,sans-serif;
+/* ===== SECTION HEADERS ===== */
+
+h2 {
+	font-size: 10pt;
+	font-weight: 700;
+	color: #a00;
+	margin-top: 10pt;
+	margin-bottom: 4pt;
+	padding-bottom: 2pt;
+	border-bottom: 0.5pt solid #ddd;
+	font-family: 'Segoe UI', Verdana, sans-serif;
+}
+
+h3 {
+	font-size: 9pt;
+	font-weight: 600;
+	color: #555;
+	margin-top: 6pt;
+	margin-bottom: 3pt;
+}
+
+/* Professional Profile - smaller text */
+h3 + p {
+	font-size: 8pt;
+	line-height: 1.35em;
+	color: #333;
+}
+
+/* ===== CONTENT ===== */
+
+p {
+	margin-bottom: 5pt;
+	line-height: 1.4em;
+}
+
+ul {
+	margin-bottom: 6pt;
+	margin-left: 0;
+}
+
+li {
+	padding-left: 10pt;
+	text-indent: -10pt;
+	margin-bottom: 2pt;
+	line-height: 1.35em;
+}
+
+li:before {
+	content: "•";
+	color: #a00;
+	margin-right: 5pt;
+}
+
+/* ===== JOB/EDUCATION ENTRIES ===== */
+
+.entry-header {
+	margin-top: 8pt;
+	padding-top: 5pt;
+	border-top: 0.5pt solid #eee;
+}
+
+.collapsible-content > .entry-header:first-of-type {
+	border-top: none;
+	padding-top: 0;
+	margin-top: 0;
+}
+
+.entry-header strong {
+	font-size: 10pt;
+	font-weight: 700;
 	color: #000;
 }
 
-p code {
-	position: relative;
-	float: right;
-	top: 0;
-	left: 0;
-	margin-right: 0;
+/* Date codes */
+code,
+code.date-code {
+	font-family: 'Consolas', 'Courier New', monospace;
+	font-size: 8pt;
+	color: #555;
+	background: #f5f5f5;
+	padding: 1pt 4pt;
+	border-radius: 2pt;
+	margin-left: 5pt;
+	display: inline;
 }
+
+/* Entry details with left border */
+ul.entry-details {
+	border-left: 2pt solid #a00;
+	padding-left: 8pt;
+	margin-left: 0;
+	margin-top: 2pt;
+}
+
+/* Job title */
+li.job-title {
+	padding-left: 0;
+	text-indent: 0;
+	margin-bottom: 3pt;
+	padding-bottom: 2pt;
+	border-bottom: 0.5pt dashed #ddd;
+}
+
+li.job-title:before {
+	content: none;
+}
+
+li.job-title em {
+	color: #a00;
+	font-weight: 600;
+	font-style: normal;
+	font-size: 9pt;
+}
+
+/* Responsibilities with arrows */
+ul.entry-details li:not(.job-title),
+ul.entry-details li.responsibility-item {
+	padding-left: 8pt;
+	text-indent: 0;
+	font-size: 8pt;
+	color: #444;
+	margin-bottom: 1pt;
+}
+
+ul.entry-details li:not(.job-title):before,
+ul.entry-details li.responsibility-item:before {
+	content: "›";
+	color: #a00;
+	margin-right: 4pt;
+	font-weight: bold;
+}
+
+/* ===== SKILLS SECTION ===== */
+
+.skill-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3pt;
+	margin: 2pt 0 6pt 0;
+}
+
+.skill-tag {
+	display: inline-block;
+	padding: 1pt 5pt;
+	border: 0.5pt solid #888;
+	border-radius: 2pt;
+	font-size: 8pt;
+	color: #333;
+	background: transparent;
+}
+
+/* Hide original skill lists when tags are shown */
+.skills-hidden {
+	display: none !important;
+}
+
+/* ===== PRINT-ONLY TECHNICAL SKILLS BOXES ===== */
+
+.print-skills-grid {
+	display: grid !important;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 6pt;
+	margin-top: 4pt;
+	margin-bottom: 8pt;
+	border-top: none !important;
+	padding-top: 0 !important;
+}
+
+/* Technical Skills header - remove border since boxes have their own borders */
+h2#technical-skills {
+	border-bottom: none !important;
+	padding-bottom: 0;
+	margin-bottom: 4pt;
+}
+
+.print-skill-category {
+	border: 0.5pt solid #888;
+	border-radius: 3pt;
+	padding: 4pt 6pt;
+	page-break-inside: avoid;
+	break-inside: avoid;
+}
+
+.print-skill-category-label {
+	display: block;
+	font-size: 8pt;
+	font-weight: 700;
+	color: #a00;
+	margin-bottom: 3pt;
+	padding-bottom: 2pt;
+	border-bottom: 0.5pt solid #ddd;
+}
+
+.print-skill-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2pt;
+}
+
+.print-skill-tag {
+	display: inline-block;
+	padding: 1pt 4pt;
+	border: 0.5pt solid #bbb;
+	border-radius: 2pt;
+	font-size: 7pt;
+	color: #444;
+	background: #f9f9f9;
+}
+
+/* ===== SPECIALIZATIONS ===== */
+
+.specialization-inline {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3pt;
+}
+
+.spec-tag {
+	display: inline-block;
+	padding: 1pt 5pt;
+	border: 0.5pt solid #888;
+	border-radius: 2pt;
+	font-size: 8pt;
+	color: #333;
+}
+
+.spec-tag:not(:last-child)::after {
+	content: none;
+}
+
+/* ===== LANGUAGES ===== */
+
+.languages-container {
+	display: flex !important;
+	gap: 8pt !important;
+	flex-wrap: wrap !important;
+	margin-bottom: 6pt !important;
+	left: auto !important;
+	width: auto !important;
+	position: static !important;
+}
+
+.language-tag {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 4pt;
+	padding: 2pt 6pt;
+	border: 0.5pt solid #888;
+	border-radius: 2pt;
+	font-size: 8pt;
+}
+
+.language-tag strong {
+	color: #000;
+	font-weight: 600;
+}
+
+.language-tag .lang-level {
+	color: #666;
+	font-size: 8pt;
+}
+
+/* ===== LINKS ===== */
 
 a {
-	color: inherit;
-	/*text-decoration:none*/
+	color: #333;
+	text-decoration: none;
 }
 
-a:hover {
-	color:#39f
+/* Show URLs after external links */
+a[href^="http"]:after {
+	content: " (" attr(href) ")";
+	font-size: 6pt;
+	color: #888;
+	word-break: break-all;
 }
+
+/* Don't show URL for internal links, email, webaddress, or body content links */
+a[href^="mailto"]:after,
+a[href^="#"]:after,
+a[href^="tel"]:after,
+#webaddress a:after,
+.text-container p a:after,
+.collapsible-content a:after {
+	content: none;
+}
+
+/* ===== EMPHASIS ===== */
 
 li em {
 	font-weight: normal;
@@ -188,39 +498,133 @@ li em {
 }
 
 em {
-	font-weight: bold;
+	font-weight: 600;
 	font-style: italic;
 }
 
 strong {
-	font-weight: bold;
+	font-weight: 700;
 }
+
+/* ===== PRINT-ONLY CONTENT ===== */
+
+.print-only {
+	display: block;
+	margin-top: 12pt;
+	padding-top: 6pt;
+	border-top: 0.5pt solid #ddd;
+	font-style: italic;
+	color: #666;
+	font-size: 7pt;
+}
+
+/* ===== HIDDEN ELEMENTS ===== */
 
 #address {
 	display: none;
 }
 
-.print-only {
-	display: block;
-	margin-left: 25%;
-	width: 73%;
-	margin-top: 2em;
-	font-style: italic;
-	color: #666;
-	font-size: 80%;
+.screen-only {
+	display: none !important;
 }
 
-/*
-@media only screen and (max-width: 480px) {
-	make one column somehow...
-}*/
+/* Hide entries beyond the limit for print */
+.print-hide-entry {
+	display: none !important;
+}
 
-/* Hide footer in print */
-footer {
+/* Ensure collapsible content is visible */
+.collapsible-content {
+	display: block !important;
+	max-height: none !important;
+	overflow: visible !important;
+}
+
+/* ===== CAREER TIMELINE (PRINT) ===== */
+.career-timeline {
+	margin-left: 0;
+	width: 100%;
+	padding-left: 10pt;
+	border-left: 2pt solid #a00;
+}
+
+.career-timeline::before {
 	display: none;
 }
 
-/* Hide elements in print */
-.print-hide {
-	display: none;
+.timeline-entry {
+	margin-bottom: 8pt;
+	page-break-inside: avoid;
+}
+
+.timeline-entry::before {
+	display: none !important;
+}
+
+.timeline-company {
+	margin-bottom: 2pt;
+}
+
+.timeline-company strong {
+	font-size: 10pt;
+	font-weight: 700;
+	color: #000;
+}
+
+.timeline-position {
+	margin-bottom: 6pt;
+	page-break-inside: avoid;
+}
+
+.position-marker,
+.promotion-badge {
+	display: none !important;
+}
+
+.position-header {
+	display: flex;
+	align-items: baseline;
+	gap: 6pt;
+	margin-bottom: 2pt;
+}
+
+.position-header em {
+	color: #a00;
+	font-style: normal;
+	font-weight: 600;
+	font-size: 9pt;
+}
+
+.position-header .date-code {
+	font-family: 'Consolas', 'Courier New', monospace;
+	font-size: 8pt;
+	color: #555;
+	background: #f5f5f5;
+	padding: 1pt 4pt;
+	border-radius: 2pt;
+}
+
+.position-details {
+	margin: 0;
+	padding: 0;
+}
+
+.position-details li {
+	padding-left: 8pt;
+	text-indent: 0;
+	font-size: 8pt;
+	color: #444;
+	margin-bottom: 1pt;
+}
+
+.position-details li::before {
+	content: "›";
+	color: #a00;
+	margin-right: 4pt;
+	font-weight: bold;
+}
+
+/* Hide previous experience in print */
+.previous-experience {
+	display: none !important;
 }

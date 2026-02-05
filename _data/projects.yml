@@ -1,0 +1,53 @@
+# Projects Data
+# Add your projects here. The first project (or one marked as highlighted: true)
+# will appear on the main CV page.
+
+- title: "Netcompany - AI-Rejseholdet"
+  date: "2024-Now"
+  highlighted: true
+  description: |
+    Specialist team delivering rapid AI/ML proof of concepts to demonstrate business value potential.
+  responsibilities:
+    - Part of a 4-person specialist team executing rapid proof of concepts at clients to demonstrate how ML and AI can impact their business
+    - Responsible for the ML/AI tech stack, identifying high-impact areas where ML or AI could drive lasting business transformation
+    - Rapid prototyping to validate ML hypotheses and demonstrate signal for scalable solutions
+    - Translating core business needs through an AI/ML lens to ensure implementations deliver tangible bottom-line value
+  technologies:
+    - Python
+    - Databricks
+    - MLflow
+    - Azure
+    - Rapid Prototyping
+  link: ""
+
+- title: "DSB AI predictions for trains"
+  date: "Dec 2023-2024"
+  highlighted: false
+  description: |
+    Led transformation of a Proof of Concept into enterprise-scale ML system delivering real-time train predictions across Denmark.
+  responsibilities:
+    - Led transformation of a Proof of Concept into enterprise-scale ML system delivering real-time train predictions across Denmark
+    - Architected and deployed network of production models that improved customer satisfaction and operational efficiency
+    - Progressed from team member to team lead and ultimately project lead, ensuring continuous business value delivery
+    - Balanced technical implementation with strategic vision, translating complex AI solutions into tangible business outcomes
+  technologies:
+    - Python
+    - Databricks
+    - MLflow
+    - Azure
+    - PySpark
+  link: ""
+
+# Add more projects below:
+# - title: "Project Name"
+#   date: "2024"
+#   highlighted: false
+#   description: |
+#     Short description of the project.
+#   responsibilities:
+#     - What you did
+#     - Another thing you did
+#   technologies:
+#     - Tech1
+#     - Tech2
+#   link: "https://github.com/..."
