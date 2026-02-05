@@ -6,7 +6,7 @@ title: Jonas Lau Frandsen's CV
 Data Science, Software Development, Team Leadership
 <div id="webaddress">
 <a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
-<span class="print-only"><br><a href="https://laufrandsen.github.io/jlfr_curriculum_vitae/">Viewing in PDF? See webpage for better formatting</a></span>
+<span class="print-only"><br><a href="https://laufrandsen.dk/">Viewing in PDF? See webpage for better formatting</a></span>
 </div>
 
 ## Currently

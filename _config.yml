@@ -1,6 +1,6 @@
 markdown: kramdown
 style: kjhealy
 
-# GitHub Pages settings
-baseurl: /jlfr_curriculum_vitae
-url: https://laufrandsen.github.io
+# GitHub Pages settings for custom domain
+baseurl: ""
+url: https://laufrandsen.dk
