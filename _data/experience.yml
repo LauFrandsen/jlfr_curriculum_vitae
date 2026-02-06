@@ -6,13 +6,13 @@
   current: true
   show_on_main: true
   positions:
-    - title: "Senior Data-_science_ Consultant"
+    - title: "Senior Data-<em>science</em> Consultant"
       date_start: "2026"
       date_end: "Now"
       promoted: true
       responsibilities:
         - Data Consultant with responsibilities solely on AI / ML projects
-        - Core role at AI-_Rejseholdet_, which specializes in PoCs and rapid prototyping
+        - Core role at AI-<em>Rejseholdet</em>, which specializes in PoCs and rapid prototyping
         - Responsible for the ML/AI tech stack, identifying high-impact areas for business transformation
         - Hypothesis based work process to ensure that the scientific proof is secured
         - Translating core business needs through an AI/ML lens to ensure bottom-line value
