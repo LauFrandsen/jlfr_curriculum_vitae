@@ -11,7 +11,7 @@ Data Science, Software Development, Team Leadership
 
 ## Currently
 
-Working as a Senior Data-science Consultant at [Netcompany](https://netcompany.com/) on the AI-Rejseholdet team, specializing in rapid AI/ML proof of concepts that demonstrate business value and identify opportunities for lasting impact.
+Working as a Senior Data-_science_ Consultant at [Netcompany](https://netcompany.com/) on AI-_Rejseholdet_, specializing in rapid AI/ML proof of concepts that demonstrate business value and identify opportunities for lasting impact.
 
 ### Professional Profile
 
