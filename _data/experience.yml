@@ -16,6 +16,10 @@
         - Responsible for the ML/AI tech stack, identifying high-impact areas for business transformation
         - Hypothesis based work process to ensure that the scientific proof is secured
         - Translating core business needs through an AI/ML lens to ensure bottom-line value
+        - Extensive work with LLMs, including agentic workflows and agent frameworks (LangChain, PydanticAI, MCP)
+        - Document extraction using language models and observability with Langfuse
+        - Strong experience in LLM evaluation — designing and running evals for correctness, reliability and quality
+        - Using Claude Code for feature building (not for data analysis or production code, for security reasons)
     - title: "Data Consultant"
       date_start: "2023"
       date_end: "2026"

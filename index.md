@@ -17,7 +17,7 @@ Working as a Senior Data-*science* Consultant at [Netcompany](https://netcompany
 
 Passionate and results-driven data scientist with a solid background in software development and data science. In my role as both a Data Scientist and Team Lead on a DSB x Netcompany project, I successfully partook in the development and implementation of AI-driven predictions for Danish trains, a solution with customers in all of Denmark. This experience has equipped me with the ability to manage Proof of Concept projects and scale them into impactful machine learning solutions that deliver tangible business value, through productionalized models.
 
-I have worked with both traditional ML such as predictive maintenance, data clustering, classifiers, timeseries prediction and regression, as well as Deep Learning, where my expertise area has been computer vision. I have general knowledge about LLM's.
+I have worked with both traditional ML such as predictive maintenance, data clustering, classifiers, timeseries prediction and regression, as well as Deep Learning, where my expertise area has been computer vision. I have strong experience with LLMs, including agentic workflows, document extraction and LLM evaluation.
 
 I thrive in collaborative team environments, leveraging my strong technical expertise and versatile skill set to drive projects forward effectively. I'm proactive by nature, always taking initiative to ensure goals are met and obstacles are addressed promptly.
 
@@ -97,8 +97,12 @@ __Programming Languages__
 - Java
 - SQL
 
-__Data Science and ML__ 
+__Data Science and ML__
 - Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, Mlflow.
+
+__LLMs and AI Agents__
+- LangChain, LlamaIndex, PydanticAI, MCP, RAG, Vector Databases, Prompt Engineering, Few-shot Prompting, Structured Output, Fine-tuning, Synthetic Data Generation, Langfuse, RAGAS, Human-in-the-loop Evaluation, Document Extraction, Claude Code (quick prototyping).
+- Experience with all major frontier AI lab APIs (OpenAI, Anthropic, Google, Meta).
 
 __Big Data Technologies__ 
 - PySpark, Hadoop File System (HFS), High-Performance Computing (HPC) with Ray as multiprocess enabler.
@@ -123,7 +127,11 @@ __Communication__
 - Adept at conveying complex technical topics to non-technical audiences.
 - Mastery of presenting for medium to large audiences on complex matters in an understandable way.
 
-__Problem-Solving__ 
+__Business-to-Solution Thinking__
+- Skilled at translating stakeholder conversations and business needs into concrete, valuable data solutions.
+- Focus on delivering impact over novelty — actively listening to customers and stakeholders to build solutions that solve real problems, not technical gimmicks.
+
+__Problem-Solving__
 - Analytical thinker with the ability to quickly learn and apply new technologies and methods.
 
 __Adaptability__ 
