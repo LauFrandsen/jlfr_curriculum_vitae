@@ -1,0 +1,56 @@
+# Experience Data
+# Career progression with timeline visualization
+
+- company: "Netcompany"
+  type: "work"
+  current: true
+  show_on_main: true
+  positions:
+    - title: "Senior Data-<em>science</em> Consultant"
+      date_start: "2026"
+      date_end: "Now"
+      promoted: true
+      responsibilities:
+        - Data Consultant with responsibilities solely on AI / ML projects
+        - Core role at AI-<em>Rejseholdet</em>, which specializes in PoCs and rapid prototyping
+        - Responsible for the ML/AI tech stack, identifying high-impact areas for business transformation
+        - Hypothesis based work process to ensure that the scientific proof is secured
+        - Translating core business needs through an AI/ML lens to ensure bottom-line value
+        - Extensive work with LLMs, including agentic workflows and agent frameworks (LangChain, PydanticAI, MCP)
+        - Document extraction using language models and observability with Langfuse
+        - Strong experience in LLM evaluation — designing and running evals for correctness, reliability and quality
+        - Using Claude Code for feature building (not for data analysis or production code, for security reasons)
+    - title: "Data Consultant"
+      date_start: "2023"
+      date_end: "2026"
+      responsibilities:
+        - Core role at a DSB x Netcompany project on AI predictions for train travel
+        - Working with clients to implement data-driven solutions using ML and AI
+        - Leading and implementing Proof of Concept projects that assess the potential for larger ML and AI implementations
+        - Developing and deploying scalable AI models using Databricks and cloud technologies
+        - Helping clients with statistical analysis and data visualization
+
+- company: "IT University of Copenhagen"
+  type: "education"
+  current: false
+  show_on_main: true
+  positions:
+    - title: "Master's degree in Software Design"
+      date_start: "2021"
+      date_end: "2023"
+      responsibilities:
+        - Specialization in AI and deep learning
+        - Electives in Big Data Management and Applied Information Security
+        - "Thesis: Searching for open-ended properties in a Large Scale Collective Intelligence system"
+        - "GPA: 10.13"
+
+- company: "University of Copenhagen"
+  type: "education"
+  current: false
+  show_on_main: false
+  positions:
+    - title: "Bachelor's degree in Film and Media Sciences"
+      date_start: "2018"
+      date_end: "2021"
+      responsibilities:
+        - "GPA: 10.50"

@@ -1,2 +1,6 @@
-markdown:   kramdown
-style:  kjhealy
+markdown: kramdown
+style: kjhealy
+
+# GitHub Pages settings for custom domain
+baseurl: ""
+url: https://laufrandsen.dk

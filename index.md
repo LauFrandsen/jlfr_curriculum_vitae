@@ -1,91 +1,150 @@
 ---
 layout: cv
-title: Isaac Newtons's CV
+title: Jonas Lau Frandsen's CV
 ---
-# Isaac Newton
-Physicist, Mathematician, Cambridge professor.
-
+# Jonas Lau Frandsen
+Data Science, Software Development, Team Leadership
 <div id="webaddress">
-<a href="isaac@applesdofall.org">isaac@applesdofall.org</a>
-| <a href="http://en.wikipedia.org/wiki/Isaac_Newton">My wikipedia page</a>
+<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
+<span class="print-only"><br><a href="https://laufrandsen.dk/">Viewing in PDF? See webpage for better formatting</a></span>
 </div>
-
 
 ## Currently
 
-Standing on the shoulders of giants
+Working as a Senior Data-*science* Consultant at [Netcompany](https://netcompany.com/) on AI-*Rejseholdet*, specializing in rapid AI/ML proof of concepts that demonstrate business value and identify opportunities for lasting impact.
+
+### Professional Profile
+
+Passionate and results-driven data scientist with a solid background in software development and data science. In my role as both a Data Scientist and Team Lead on a DSB x Netcompany project, I successfully partook in the development and implementation of AI-driven predictions for Danish trains, a solution with customers in all of Denmark. This experience has equipped me with the ability to manage Proof of Concept projects and scale them into impactful machine learning solutions that deliver tangible business value, through productionalized models.
+
+I have worked with both traditional ML such as predictive maintenance, data clustering, classifiers, timeseries prediction and regression, as well as Deep Learning, where my expertise area has been computer vision. I have strong experience with LLMs, including agentic workflows, document extraction and LLM evaluation.
+
+I thrive in collaborative team environments, leveraging my strong technical expertise and versatile skill set to drive projects forward effectively. I'm proactive by nature, always taking initiative to ensure goals are met and obstacles are addressed promptly.
 
 ### Specialized in
 
-Laws of motion, gravitation, minting coins, disliking [Robert Hooke](http://en.wikipedia.org/wiki/Robert_Hooke)
+Data Science, Team-leading, Machine Learning, AI, Software Development and Data Visualization
 
+## Highlighted project
 
-### Research interests
+{% assign highlighted_project = site.data.projects | where: "highlighted", true | first %}
+{% if highlighted_project %}
+`{{ highlighted_project.date }}`
+__{{ highlighted_project.title }}__
+{% for resp in highlighted_project.responsibilities %}- {{ resp }}
+{% endfor %}
+<span class="screen-only" style="font-size: 0.85em; color: var(--text-muted);">[View all projects](projects.html)</span>
+{% endif %}
 
-Cooling, power series, optics, alchemy, planetary motions, apples.
+## Education and work experience
 
+<div class="career-timeline" data-source="experience">
+{% for entry in site.data.experience %}{% if entry.show_on_main %}
+<div class="timeline-entry {% if entry.current %}current{% endif %}" data-type="{{ entry.type }}">
+<div class="timeline-company">
+<strong>{{ entry.company }}</strong>
+</div>
+<div class="timeline-positions">
+{% for pos in entry.positions %}
+<div class="timeline-position {% if pos.promoted %}promoted{% endif %}">
+<div class="position-marker"></div>
+<div class="position-content">
+<div class="position-header">
+<em>{{ pos.title }}</em>
+<code class="date-code">{{ pos.date_start }}-{{ pos.date_end }}</code>
+</div>
+<ul class="position-details">
+{% for resp in pos.responsibilities %}<li>{{ resp }}</li>
+{% endfor %}</ul>
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+{% endif %}{% endfor %}
+</div>
 
-## Education
+<details class="previous-experience screen-only">
+<summary>Previous Experience and Education</summary>
+{% for entry in site.data.experience %}{% unless entry.show_on_main %}
+<div class="timeline-entry" data-type="{{ entry.type }}">
+<div class="timeline-company">
+<strong>{{ entry.company }}</strong>
+</div>
+<div class="timeline-positions">
+{% for pos in entry.positions %}
+<div class="timeline-position">
+<div class="position-content">
+<div class="position-header">
+<em>{{ pos.title }}</em>
+<code class="date-code">{{ pos.date_start }}-{{ pos.date_end }}</code>
+</div>
+<ul class="position-details">
+{% for resp in pos.responsibilities %}<li>{{ resp }}</li>
+{% endfor %}</ul>
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+{% endunless %}{% endfor %}
+</details>
 
-`1654-1660`
-__The King's School, Grantham.__
+## Technical Skills
 
-`June 1661 - now`
-__Trinity College, Cambridge__
+__Programming Languages__ 
+- Python - Incredibly strong background for both low-level and high-level programming.
+- Java
+- SQL
 
-- Sizar
+__Data Science and ML__
+- Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, Mlflow.
 
-`1667 - death`
-__Trinity College, Cambridge__
+__LLMs and AI Agents__
+- LangChain, LlamaIndex, PydanticAI, MCP, RAG, Vector Databases, Prompt Engineering, Few-shot Prompting, Structured Output, Fine-tuning, Synthetic Data Generation, Langfuse, RAGAS, Human-in-the-loop Evaluation, Document Extraction, Claude Code (quick prototyping).
+- Experience with all major frontier AI lab APIs (OpenAI, Anthropic, Google, Meta).
 
-- Fellow
+__Big Data Technologies__ 
+- PySpark, Hadoop File System (HFS), High-Performance Computing (HPC) with Ray as multiprocess enabler.
 
+__Cloud and MlOps__ 
+- Databricks, Cloud deployment of AI models, MLOps, ModelMesh, AI Health Monitoring set-ups, Virtual machines mainly on Azure platforms.
 
+__Systems__ 
+- Experienced with Linux, Windows, and macOS
 
-## Awards
+__Security__ 
+- Fundamental understanding of information security and why it is important. 
 
-`2012`
-President, *Royal Society*, London, UK
+## Personal Skills
 
-Associate, *French Academy of Science*, Paris, France
+__Team Leadership__ 
+- Experience as Team Lead with the ability to motivate and coordinate teams.
+- Experience as Project lead with understanding of project planning, team management and successful deliveries.
 
+__Communication__ 
+- Strong stakeholder management skills.
+- Adept at conveying complex technical topics to non-technical audiences.
+- Mastery of presenting for medium to large audiences on complex matters in an understandable way.
 
+__Business-to-Solution Thinking__
+- Skilled at translating stakeholder conversations and business needs into concrete, valuable data solutions.
+- Focus on delivering impact over novelty — actively listening to customers and stakeholders to build solutions that solve real problems, not technical gimmicks.
 
-## Publications
+__Problem-Solving__
+- Analytical thinker with the ability to quickly learn and apply new technologies and methods.
 
-<!-- A list is also available [online](http://scholar.google.co.uk/citations?user=LTOTl0YAAAAJ) -->
+__Adaptability__ 
+- Highly flexible with the ability to adapt to changing project requirements, technologies and the organisation around projects.
 
-### Journals
+### Languages
 
-`1669`
-Newton Sir I, De analysi per æquationes numero terminorum infinitas. 
+__Danish__ 
+- Native Language
 
-`1669`
-Lectiones opticæ.
+__English__ 
+- Fluent
 
-etc. etc. etc.
-
-### Patents
-
-`2012`
-Infinitesimal calculus for solutions to physics problems, [SMBC](http://www.techdirt.com/articles/20121011/09312820678/if-patents-had-been-around-time-newton.shtml) patent 001
-
-
-## Occupation
-
-`1600`
-__Royal Mint__, London
-
-- Warden
-- Minted coins
-
-`1600`
-__Lucasian professor of Mathematics__, Cambridge University
-
-
-
-<!-- ### Footer
-
-Last updated: May 2013 -->
-
-
+<div class="print-only">
+This CV was printed from my online portfolio. For the most up-to-date version, please visit my website.
+</div>
