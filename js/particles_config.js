@@ -1,6 +1,6 @@
-// Determine initial color based on saved theme - default to dark mode
+// Determine initial color based on saved theme - default to light mode
 const savedTheme = localStorage.getItem('theme');
-const isDarkMode = savedTheme !== 'light';
+const isDarkMode = savedTheme === 'dark';
 const particleColor = isDarkMode ? '#ffffff' : '#000000';
 
 particlesJS('particles-js', {
