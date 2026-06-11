@@ -1,14 +1,30 @@
 # Experience Data
 # Career progression with timeline visualization
 
-- company: "Netcompany"
+- company: "Heyra"
   type: "work"
   current: true
   show_on_main: true
   positions:
-    - title: "Senior Data-<em>science</em> Consultant"
+    - title: "Senior AI Engineer"
       date_start: "2026"
       date_end: "Now"
+      responsibilities:
+        - Designing and building AI and ML systems end-to-end at scale — taking ideas from problem to prototype to production for clients' businesses
+        - Building both purely agentic flows and traditional ML wrapped in agents, delivering the real AI experience — chat with your data and get predictive insights from the same system
+        - Trusted advisor on fast-moving AI technologies, ensuring the AI we build delivers tangible business value rather than novelty
+        - Focus on agentic workflows, machine learning, decision intelligence, document extraction and LLM evaluations
+        - Laying the data foundations that keep AI and ML systems reliable in production
+        - Spec-driven development and agentic coding workflows, moving from a clear spec to shipped AI and ML fast
+
+- company: "Netcompany"
+  type: "work"
+  current: false
+  show_on_main: true
+  positions:
+    - title: "Senior Data-<em>science</em> Consultant"
+      date_start: "2026"
+      date_end: "2026"
       promoted: true
       responsibilities:
         - Data Consultant with responsibilities solely on AI / ML projects

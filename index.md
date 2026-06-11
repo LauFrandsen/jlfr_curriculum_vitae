@@ -3,7 +3,7 @@ layout: cv
 title: Jonas Lau Frandsen's CV
 ---
 # Jonas Lau Frandsen
-Data Science, Software Development, Team Leadership
+AI Engineering, Data Science, Software Development
 <div id="webaddress">
 <a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
 <span class="print-only"><br><a href="https://laufrandsen.dk/">Viewing in PDF? See webpage for better formatting</a></span>
@@ -11,11 +11,11 @@ Data Science, Software Development, Team Leadership
 
 ## Currently
 
-Working as a Senior Data-*science* Consultant at [Netcompany](https://netcompany.com/) on AI-*Rejseholdet*, specializing in rapid AI/ML proof of concepts that demonstrate business value and identify opportunities for lasting impact.
+Working as a Senior AI Engineer at [Heyra](https://heyra.io/), designing and building AI and ML systems end-to-end — from problem to prototype to production. I build both purely agentic flows and traditional ML wrapped in agents, delivering the real AI experience: chat with your data and get predictive insights from the same system.
 
 ### Professional Profile
 
-Passionate and results-driven data scientist with a solid background in software development and data science. In my role as both a Data Scientist and Team Lead on a DSB x Netcompany project, I successfully partook in the development and implementation of AI-driven predictions for Danish trains, a solution with customers in all of Denmark. This experience has equipped me with the ability to manage Proof of Concept projects and scale them into impactful machine learning solutions that deliver tangible business value, through productionalized models.
+Passionate and results-driven AI Engineer & Data Scientist with a solid background in software development. In my role as both a Data Scientist and Team Lead on a DSB x Netcompany project, I successfully partook in the development and implementation of AI-driven predictions for Danish trains, a solution with customers in all of Denmark. This experience has equipped me with the ability to manage Proof of Concept projects and scale them into impactful machine learning solutions that deliver tangible business value, through productionalized models.
 
 I have worked with both traditional ML such as predictive maintenance, data clustering, classifiers, timeseries prediction and regression, as well as Deep Learning, where my expertise area has been computer vision. I have strong experience with LLMs, including agentic workflows, document extraction and LLM evaluation.
 
@@ -23,7 +23,7 @@ I thrive in collaborative team environments, leveraging my strong technical expe
 
 ### Specialized in
 
-Data Science, Team-leading, Machine Learning, AI, Software Development and Data Visualization
+Agentic AI, Machine Learning, Data Science, Team-leading, Software Development and Data Visualization
 
 ## Highlighted project
 
