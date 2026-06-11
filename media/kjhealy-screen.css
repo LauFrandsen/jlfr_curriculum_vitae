@@ -1018,7 +1018,7 @@ li li {
 	50% { box-shadow: 0 0 0 3px var(--card-bg), 0 0 0 8px rgba(170, 0, 0, 0.3); }
 }
 
-body.dark-mode .timeline-position.promoted .position-marker {
+body.dark-mode .timeline-entry.current .timeline-position:first-child .position-marker {
 	animation-name: pulse-dark;
 }
 
@@ -1063,7 +1063,8 @@ body.dark-mode .timeline-position.promoted .position-marker {
 	z-index: 1;
 }
 
-.timeline-position.promoted .position-marker {
+/* Current role: big pulsing marker on the first position of the current entry */
+.timeline-entry.current .timeline-position:first-child .position-marker {
 	background: var(--timeline-color);
 	width: 12px;
 	height: 12px;
@@ -1071,6 +1072,11 @@ body.dark-mode .timeline-position.promoted .position-marker {
 	top: 0.15em;
 	box-shadow: 0 0 0 3px var(--card-bg), 0 0 0 5px var(--timeline-color);
 	animation: pulse 2s ease-in-out infinite;
+}
+
+/* Promotion point: small solid marker, no pulse */
+.timeline-position.promoted .position-marker {
+	background: var(--timeline-color);
 }
 
 .position-content {
