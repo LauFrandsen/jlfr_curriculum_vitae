@@ -16,506 +16,54 @@
   <!-- Apply dark mode immediately to prevent flash (only if explicitly set) -->
   <script>
     if (localStorage.getItem('theme') === 'dark') {
-      document.documentElement.classList.add('dark-mode-pending');
+      document.documentElement.classList.add('dark');
     }
   </script>
-  <style>
-    html.dark-mode-pending body { background: #1a1a2e; }
-  </style>
 
-  <link href="{{ site.baseurl }}/media/{{ site.style }}-screen.css?v=5" type="text/css" rel="stylesheet" media="screen">
-  <link href="{{ site.baseurl }}/media/{{ site.style }}-print.css?v=5" type="text/css" rel="stylesheet" media="print">
+  <!-- Fonts: Inter 300/400/500 + JetBrains Mono 400/500 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- Particles.js -->
-  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  <link href="{{ site.baseurl }}/media/{{ site.style }}-screen.css?v=1" type="text/css" rel="stylesheet" media="screen">
+  <link href="{{ site.baseurl }}/media/{{ site.style }}-print.css?v=1" type="text/css" rel="stylesheet" media="print">
 </head>
 <body>
-  <!-- Apply dark mode class only if explicitly set -->
-  <script>
-    if (localStorage.getItem('theme') === 'dark') {
-      document.body.classList.add('dark-mode');
-    }
-  </script>
 
-  <!-- Particles Background -->
-  <div id="particles-js"></div>
-
-  <!-- Control Buttons -->
-  <div class="controls-container">
-    <button class="control-btn dark-mode-toggle" id="darkModeToggle" title="Toggle Dark Mode" aria-label="Toggle dark mode">
-      <span class="icon-sun">☀️</span>
-      <span class="icon-moon">🌙</span>
+  <!-- Controls -->
+  <div class="controls screen-only">
+    <button class="control-btn" id="themeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <span class="theme-icon-light">Dark</span>
+      <span class="theme-icon-dark">Light</span>
     </button>
-    <button class="control-btn print-btn" id="printBtn" title="Print / Save as PDF" aria-label="Print CV">
-      🖨️
-    </button>
-    <button class="control-btn nav-toggle" id="navToggle" title="Navigation" aria-label="Toggle navigation">
-      ☰
-    </button>
+    <button class="control-btn" id="printBtn" title="Print / Save as PDF" aria-label="Print CV">Print</button>
   </div>
 
-  <!-- Navigation Menu -->
-  <nav class="nav-menu" id="navMenu">
-    <div class="nav-header">
-      <span>Sections</span>
-      <button class="nav-close" id="navClose" aria-label="Close navigation">×</button>
-    </div>
-    <ul class="nav-links" id="navLinks">
-      <!-- Populated by JavaScript -->
-    </ul>
-  </nav>
+  <main id="content">
+    {{ content }}
 
-  <!-- Main Content -->
-  <div id="content">
-    <div class="text-container">
-      {{ content }}
-    </div>
-    <footer class="site-footer">
-      <p>CV last updated: February 2026</p>
-      <p>Particles effect by <a href="https://github.com/VincentGarreau/particles.js/">Vincent Garreau</a></p>
+    <footer class="site-footer screen-only">
+      <div class="footer-wordmark" aria-hidden="true">jonas lau frandsen</div>
+      <p class="footer-meta">CV last updated June 2026 &middot; <a href="https://github.com/LauFrandsen/jlfr_curriculum_vitae">Built with Jekyll</a></p>
     </footer>
-  </div>
+  </main>
 
-  <!-- Particles Config -->
-  <script src="{{ site.baseurl }}/js/particles_config.js"></script>
-
-  <!-- Interactive Features -->
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // ===== DARK MODE =====
-      const darkModeToggle = document.getElementById('darkModeToggle');
-      const body = document.body;
+    // Theme toggle — token swap via .dark on <html>
+    document.getElementById('themeToggle').addEventListener('click', function () {
+      const root = document.documentElement;
+      root.classList.toggle('dark');
+      localStorage.setItem('theme', root.classList.contains('dark') ? 'dark' : 'light');
+    });
 
-      // Dark mode already applied in body script, just ensure consistency
-      if (localStorage.getItem('theme') === 'dark' && !body.classList.contains('dark-mode')) {
-        body.classList.add('dark-mode');
-      }
-
-      darkModeToggle.addEventListener('click', function() {
-        body.classList.toggle('dark-mode');
-        const isDark = body.classList.contains('dark-mode');
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
-
-        // Update particles color
-        if (window.pJSDom && window.pJSDom[0]) {
-          const particles = window.pJSDom[0].pJS.particles;
-          const newColor = isDark ? '#ffffff' : '#000000';
-          particles.color.value = newColor;
-          particles.line_linked.color = newColor;
-          window.pJSDom[0].pJS.fn.particlesRefresh();
-        }
-      });
-
-      // ===== NAVIGATION =====
-      const navToggle = document.getElementById('navToggle');
-      const navMenu = document.getElementById('navMenu');
-      const navClose = document.getElementById('navClose');
-      const navLinks = document.getElementById('navLinks');
-
-      // Build navigation from h2 headers
-      const sections = document.querySelectorAll('h2');
-      sections.forEach((section, index) => {
-        // Add ID for linking
-        const id = section.textContent.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        section.id = id;
-
-        // Create nav link
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = '#' + id;
-        a.textContent = section.textContent;
-        a.addEventListener('click', function(e) {
-          e.preventDefault();
-          navMenu.classList.remove('open');
-          document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-        });
-        li.appendChild(a);
-        navLinks.appendChild(li);
-      });
-
-      // Add Projects page link if on main CV
-      const isProjectsPage = window.location.pathname.includes('projects');
-      if (!isProjectsPage) {
-        const projectsLi = document.createElement('li');
-        projectsLi.style.borderTop = '1px solid var(--border-color)';
-        projectsLi.style.marginTop = '0.5em';
-        projectsLi.style.paddingTop = '0.5em';
-        const projectsLink = document.createElement('a');
-        projectsLink.href = 'projects.html';
-        projectsLink.textContent = '📁 All Projects';
-        projectsLi.appendChild(projectsLink);
-        navLinks.appendChild(projectsLi);
-      } else {
-        // On projects page, add link back to CV
-        const cvLi = document.createElement('li');
-        cvLi.style.borderTop = '1px solid var(--border-color)';
-        cvLi.style.marginTop = '0.5em';
-        cvLi.style.paddingTop = '0.5em';
-        const cvLink = document.createElement('a');
-        cvLink.href = 'index.html';
-        cvLink.textContent = '← Back to CV';
-        cvLi.appendChild(cvLink);
-        navLinks.appendChild(cvLi);
-      }
-
-      navToggle.addEventListener('click', () => navMenu.classList.toggle('open'));
-      navClose.addEventListener('click', () => navMenu.classList.remove('open'));
-
-      // Close nav when clicking outside
-      document.addEventListener('click', function(e) {
-        if (!navMenu.contains(e.target) && !navToggle.contains(e.target)) {
-          navMenu.classList.remove('open');
-        }
-      });
-
-      // ===== PRINT BUTTON =====
-      const printBtn = document.getElementById('printBtn');
-      printBtn.addEventListener('click', function() {
-        // Expand all collapsible sections before printing
-        document.querySelectorAll('.collapsible-content').forEach(el => {
-          el.style.maxHeight = 'none';
-        });
-        window.print();
-      });
-
-      // ===== COLLAPSIBLE SECTIONS =====
-      const h2Headers = document.querySelectorAll('h2');
-      h2Headers.forEach(header => {
-        // Create toggle button
-        const toggle = document.createElement('span');
-        toggle.className = 'collapse-toggle';
-        toggle.innerHTML = '−';
-        toggle.title = 'Collapse section';
-        header.appendChild(toggle);
-
-        // Wrap content until next h2
-        const content = document.createElement('div');
-        content.className = 'collapsible-content';
-
-        let sibling = header.nextElementSibling;
-        const siblings = [];
-        while (sibling && sibling.tagName !== 'H2') {
-          siblings.push(sibling);
-          sibling = sibling.nextElementSibling;
-        }
-
-        if (siblings.length > 0) {
-          header.parentNode.insertBefore(content, siblings[0]);
-          siblings.forEach(s => content.appendChild(s));
-
-          // Don't set max-height initially - let it be natural
-          content.style.maxHeight = 'none';
-
-          header.style.cursor = 'pointer';
-          header.addEventListener('click', function(e) {
-            if (e.target === toggle || e.target === header) {
-              const isCollapsed = content.classList.toggle('collapsed');
-              toggle.innerHTML = isCollapsed ? '+' : '−';
-              toggle.title = isCollapsed ? 'Expand section' : 'Collapse section';
-
-              if (isCollapsed) {
-                content.style.maxHeight = content.scrollHeight + 'px';
-                // Force reflow then set to 0
-                content.offsetHeight;
-                content.style.maxHeight = '0';
-              } else {
-                content.style.maxHeight = content.scrollHeight + 'px';
-                // After animation, remove max-height constraint
-                setTimeout(() => {
-                  if (!content.classList.contains('collapsed')) {
-                    content.style.maxHeight = 'none';
-                  }
-                }, 400);
-              }
-            }
-          });
-        }
-      });
-
-      // ===== SMOOTH SCROLL =====
-      document.documentElement.style.scrollBehavior = 'smooth';
-
-      // ===== SPECIALIZATIONS ENHANCEMENT =====
-      // Find and style the "Specialized in" section - inline with header
-      const specializedHeader = Array.from(document.querySelectorAll('h3')).find(h =>
-        h.textContent.toLowerCase().includes('specialized')
-      );
-
-      if (specializedHeader) {
-        const specParagraph = specializedHeader.nextElementSibling;
-        if (specParagraph && specParagraph.tagName === 'P') {
-          const specText = specParagraph.textContent;
-          const specs = specText.split(',').map(s => s.trim()).filter(s => s);
-
-          // Create inline tags
-          const tagsSpan = document.createElement('span');
-          tagsSpan.className = 'specialization-inline';
-
-          specs.forEach((spec, index) => {
-            const tag = document.createElement('span');
-            tag.className = 'spec-tag';
-            tag.textContent = spec;
-            tagsSpan.appendChild(tag);
-          });
-
-          // Add tags inline to the paragraph, keep it positioned normally
-          specParagraph.innerHTML = '';
-          specParagraph.appendChild(tagsSpan);
-          specParagraph.classList.add('spec-paragraph');
-        }
-      }
-
-      // Also style the subtitle (line after h1)
-      const h1 = document.querySelector('h1');
-      if (h1) {
-        const subtitle = h1.nextElementSibling;
-        if (subtitle && subtitle.tagName === 'P' && !subtitle.id) {
-          const subtitleText = subtitle.textContent;
-          if (subtitleText.includes(',')) {
-            const items = subtitleText.split(',').map(s => s.trim());
-            subtitle.innerHTML = items.map(item =>
-              `<span class="subtitle-tag">${item}</span>`
-            ).join('<span class="subtitle-sep">·</span>');
-            subtitle.classList.add('subtitle-enhanced');
-          }
-        }
-      }
-
-      // ===== DATE POSITIONING & ENTRY STYLING =====
-      // Move date codes to appear after titles and add classes for styling
-      document.querySelectorAll('p > code:first-child').forEach(code => {
-        const p = code.parentElement;
-        const strong = p.querySelector('strong');
-
-        // If paragraph has both a code (date) and strong (title)
-        if (strong && code.textContent.match(/\d{4}/)) {
-          // Mark paragraph as an entry header
-          p.classList.add('entry-header');
-
-          // Remove the code from its current position
-          code.remove();
-
-          // Add separator and date after the title
-          const separator = document.createTextNode(' ');
-          const dateSpan = document.createElement('code');
-          dateSpan.textContent = code.textContent;
-          dateSpan.className = 'date-code';
-
-          // Insert after the strong element
-          if (strong.nextSibling) {
-            strong.parentNode.insertBefore(separator, strong.nextSibling);
-            strong.parentNode.insertBefore(dateSpan, separator.nextSibling);
-          } else {
-            strong.parentNode.appendChild(separator);
-            strong.parentNode.appendChild(dateSpan);
-          }
-
-          // Find the following ul and mark it as entry-details
-          const nextUl = p.nextElementSibling;
-          if (nextUl && nextUl.tagName === 'UL') {
-            nextUl.classList.add('entry-details');
-
-            // Mark first li as job-title if it contains em
-            const firstLi = nextUl.querySelector('li:first-child');
-            if (firstLi && firstLi.querySelector('em')) {
-              firstLi.classList.add('job-title');
-            }
-          }
-        }
-      });
-
-      // ===== LIMIT ENTRIES FOR PRINT =====
-      // Mark entries beyond the first 3 in Education/Work section for print hiding
-      const eduWorkHeader = Array.from(document.querySelectorAll('h2')).find(h =>
-        h.textContent.toLowerCase().includes('education') && h.textContent.toLowerCase().includes('work')
-      );
-
-      if (eduWorkHeader) {
-        const content = eduWorkHeader.nextElementSibling;
-        if (content && content.classList.contains('collapsible-content')) {
-          const entries = content.querySelectorAll('.entry-header');
-          entries.forEach((entry, index) => {
-            if (index >= 3) {
-              entry.classList.add('print-hide-entry');
-              // Also hide the following entry-details
-              const nextUl = entry.nextElementSibling;
-              if (nextUl && nextUl.classList.contains('entry-details')) {
-                nextUl.classList.add('print-hide-entry');
-              }
-            }
-          });
-        }
-      }
-
-      // Mark highlighted projects beyond the first one for print hiding
-      const highlightedHeader = Array.from(document.querySelectorAll('h2')).find(h =>
-        h.textContent.toLowerCase().includes('highlighted')
-      );
-
-      if (highlightedHeader) {
-        const content = highlightedHeader.nextElementSibling;
-        if (content && content.classList.contains('collapsible-content')) {
-          const entries = content.querySelectorAll('.entry-header');
-          entries.forEach((entry, index) => {
-            if (index >= 1) {
-              entry.classList.add('print-hide-entry');
-              const nextUl = entry.nextElementSibling;
-              if (nextUl && nextUl.classList.contains('entry-details')) {
-                nextUl.classList.add('print-hide-entry');
-              }
-            }
-          });
-        }
-      }
-
-      // ===== PERSONAL SKILLS STYLING =====
-      // Apply entry-details styling to Personal Skills section
-      const personalSkillsHeader = Array.from(document.querySelectorAll('h2')).find(h =>
-        h.textContent.toLowerCase().includes('personal skills')
-      );
-
-      if (personalSkillsHeader) {
-        const content = personalSkillsHeader.nextElementSibling;
-        if (content && content.classList.contains('collapsible-content')) {
-          // Find all paragraphs with strong (skill category names)
-          content.querySelectorAll('p').forEach(p => {
-            const strong = p.querySelector('strong');
-            if (strong) {
-              p.classList.add('entry-header');
-              const nextUl = p.nextElementSibling;
-              if (nextUl && nextUl.tagName === 'UL') {
-                nextUl.classList.add('entry-details');
-                // Mark all items as responsibilities (with arrows)
-                nextUl.querySelectorAll('li').forEach(li => {
-                  li.classList.add('responsibility-item');
-                });
-              }
-            }
-          });
-        }
-      }
-
-      // ===== LANGUAGES STYLING =====
-      const languagesHeader = Array.from(document.querySelectorAll('h3')).find(h =>
-        h.textContent.toLowerCase().includes('languages')
-      );
-
-      if (languagesHeader) {
-        // Find the content after Languages header
-        let sibling = languagesHeader.nextElementSibling;
-        const languageItems = [];
-
-        while (sibling && sibling.tagName !== 'H2' && sibling.tagName !== 'H3') {
-          if (sibling.tagName === 'P' && sibling.querySelector('strong')) {
-            const lang = sibling.querySelector('strong').textContent;
-            const nextEl = sibling.nextElementSibling;
-            let level = '';
-            if (nextEl && nextEl.tagName === 'UL') {
-              level = nextEl.querySelector('li')?.textContent || '';
-              nextEl.remove();
-            }
-            languageItems.push({ lang, level });
-            const oldP = sibling;
-            sibling = sibling.nextElementSibling;
-            oldP.remove();
-          } else {
-            sibling = sibling.nextElementSibling;
-          }
-        }
-
-        if (languageItems.length > 0) {
-          const langContainer = document.createElement('div');
-          langContainer.className = 'languages-container';
-          langContainer.style.cssText = 'position: relative; left: 22%; width: 76%; display: flex; gap: 1.5em; flex-wrap: wrap; margin-bottom: 1em;';
-
-          languageItems.forEach(item => {
-            const langTag = document.createElement('span');
-            langTag.className = 'language-tag';
-            langTag.innerHTML = `<strong>${item.lang}</strong> <span class="lang-level">${item.level}</span>`;
-            langContainer.appendChild(langTag);
-          });
-
-          languagesHeader.parentNode.insertBefore(langContainer, languagesHeader.nextElementSibling);
-        }
-      }
-
-      // ===== SKILLS ENHANCEMENT =====
-      // Find Technical Skills section and enhance it
-      const skillsHeader = Array.from(document.querySelectorAll('h2')).find(h =>
-        h.textContent.toLowerCase().includes('technical skills')
-      );
-
-      if (skillsHeader) {
-        const skillsContent = skillsHeader.nextElementSibling;
-        if (skillsContent && skillsContent.classList.contains('collapsible-content')) {
-          // Create a print-only skills grid container
-          const printSkillsGrid = document.createElement('div');
-          printSkillsGrid.className = 'print-skills-grid print-only';
-
-          // Add skill tags to each category
-          const skillCategories = skillsContent.querySelectorAll('p');
-          skillCategories.forEach(p => {
-            const strong = p.querySelector('strong');
-            if (strong && p.nextElementSibling && p.nextElementSibling.tagName === 'UL') {
-              const ul = p.nextElementSibling;
-              const categoryName = strong.textContent.replace(/_+/g, '').trim();
-
-              // Create screen-only skill tags container
-              const tagsContainer = document.createElement('div');
-              tagsContainer.className = 'skill-tags screen-only';
-
-              // Create print-only category box
-              const printCategoryBox = document.createElement('div');
-              printCategoryBox.className = 'print-skill-category';
-
-              const categoryLabel = document.createElement('span');
-              categoryLabel.className = 'print-skill-category-label';
-              categoryLabel.textContent = categoryName;
-              printCategoryBox.appendChild(categoryLabel);
-
-              const printTagsContainer = document.createElement('div');
-              printTagsContainer.className = 'print-skill-tags';
-
-              // Get all list items and split each by comma
-              const listItems = Array.from(ul.querySelectorAll('li'));
-              listItems.forEach(li => {
-                const text = li.textContent;
-                // Split by comma and create individual tags
-                const skills = text.split(',').map(s => s.trim()).filter(s => s.length > 0);
-                skills.forEach(skill => {
-                  // Clean up the skill name (remove descriptions after " - ")
-                  const skillName = skill.split(' - ')[0].trim();
-                  if (skillName) {
-                    // Screen tag
-                    const tag = document.createElement('span');
-                    tag.className = 'skill-tag';
-                    tag.textContent = skillName;
-                    tagsContainer.appendChild(tag);
-
-                    // Print tag
-                    const printTag = document.createElement('span');
-                    printTag.className = 'print-skill-tag';
-                    printTag.textContent = skillName;
-                    printTagsContainer.appendChild(printTag);
-                  }
-                });
-              });
-
-              printCategoryBox.appendChild(printTagsContainer);
-              printSkillsGrid.appendChild(printCategoryBox);
-
-              // Insert screen tags after the list and hide the original list
-              ul.parentNode.insertBefore(tagsContainer, ul.nextSibling);
-              ul.classList.add('skills-hidden');
-              p.classList.add('screen-only'); // Hide the category header on screen (tags are self-explanatory)
-            }
-          });
-
-          // Insert print skills grid at the beginning of skills content
-          skillsContent.insertBefore(printSkillsGrid, skillsContent.firstChild);
-        }
-      }
-
+    // Print — expand collapsed sections first so nothing is lost on paper
+    function expandForPrint() {
+      document.querySelectorAll('details').forEach(d => { d.open = true; });
+    }
+    window.addEventListener('beforeprint', expandForPrint);
+    document.getElementById('printBtn').addEventListener('click', function () {
+      expandForPrint();
+      window.print();
     });
   </script>
 </body>

@@ -2,32 +2,42 @@
 layout: cv
 title: Jonas Lau Frandsen's Projects
 ---
-# Projects
-A collection of my professional and personal projects.
 
-<div id="webaddress">
-<a href="index.html">← Back to CV</a> | <a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a>
+<header class="hero">
+<span class="eyebrow">Projects</span>
+<h1>Selected work. <span class="dim">Professional &amp; personal.</span></h1>
+<div class="hero-links">
+<a class="arrow-link" href="index.html">Back to CV</a>
+<a class="arrow-link" href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a>
 </div>
+</header>
 
-## All Projects
-
+<section class="section" id="all-projects">
+<div class="section-grid">
+<div class="section-label"><span class="eyebrow">All projects</span></div>
+<div class="section-body">
 {% for project in site.data.projects %}
-`{{ project.date }}`
-__{{ project.title }}__{% if project.highlighted %} ⭐{% endif %}
-
-{{ project.description }}
-
+<div class="project-card" style="margin-bottom: 1rem;">
+<span class="project-date">{{ project.date }}</span>
+<h3>{{ project.title }}</h3>
+<p>{{ project.description }}</p>
 {% if project.responsibilities %}
-{% for resp in project.responsibilities %}- {{ resp }}
-{% endfor %}
+<ul>
+{% for resp in project.responsibilities %}<li>{{ resp }}</li>
+{% endfor %}</ul>
 {% endif %}
-
+<div class="project-footer">
 {% if project.technologies %}
-**Technologies:** {{ project.technologies | join: ", " }}
+<div class="tag-list">
+{% for tech in project.technologies %}<span class="tag">{{ tech }}</span>{% endfor %}
+</div>
 {% endif %}
-
 {% if project.link and project.link != "" %}
-[View Project]({{ project.link }})
+<a class="arrow-link" href="{{ project.link }}">View project</a>
 {% endif %}
-
+</div>
+</div>
 {% endfor %}
+</div>
+</div>
+</section>

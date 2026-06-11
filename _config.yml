@@ -1,6 +1,12 @@
 markdown: kramdown
-style: kjhealy
+style: editorial
 
 # GitHub Pages settings for custom domain
 baseurl: ""
 url: https://laufrandsen.dk
+
+# Working notes — never publish
+exclude:
+  - HANDOFF.md
+  - README.md
+  - LICENSE
