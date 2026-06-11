@@ -5,7 +5,7 @@ title: Jonas Lau Frandsen's CV
 # Jonas Lau Frandsen
 AI Engineering, Data Science, Software Development
 <div id="webaddress">
-<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a>
+<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a> | Copenhagen, Denmark
 <span class="print-only"><br><a href="https://laufrandsen.dk/">Viewing in PDF? See webpage for better formatting</a></span>
 </div>
 
@@ -144,6 +144,10 @@ __Danish__
 
 __English__ 
 - Fluent
+
+## Beyond Work
+
+Ten years of Dungeons & Dragons with the same party, and as much hiking and sleeping outdoors as the calendar allows — fully committed on both fronts.
 
 <div class="print-only">
 This CV was printed from my online portfolio. For the most up-to-date version, please visit my website.
