@@ -1,4 +1,4 @@
-# Jonas Lau Frandsen's CV - Project Documentation
+# Jonas Biune Frandsen's CV - Project Documentation
 
 ## Overview
 

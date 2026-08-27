@@ -1,6 +1,6 @@
 ---
 layout: cv
-title: Jonas Lau Frandsen's Projects
+title: Jonas Biune Frandsen's Projects
 ---
 # Projects
 A collection of my professional and personal projects.

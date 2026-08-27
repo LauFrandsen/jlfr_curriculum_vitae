@@ -1,8 +1,8 @@
 ---
 layout: cv
-title: Jonas Lau Frandsen's CV
+title: Jonas Biune Frandsen's CV
 ---
-# Jonas Lau Frandsen
+# Jonas Biune Frandsen
 AI Engineering, Data Science, Software Development
 <div id="webaddress">
 <a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a> | Copenhagen, Denmark
