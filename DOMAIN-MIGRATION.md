@@ -5,8 +5,9 @@ published: false
 # Domain migration: laufrandsen.dk → biunefrandsen.dk
 
 The CV display name changed from "Jonas Lau Frandsen" to "Jonas Biune Frandsen"
-in August 2026. The domain, email address, and LinkedIn handle were deliberately
-left on the old `laufrandsen.dk` identity at that time.
+in August 2026. The LinkedIn vanity URL has since moved to
+`linkedin.com/in/biunefrandsen`. The domain and email address are still on the
+old `laufrandsen.dk` identity.
 
 ## Plan
 
@@ -22,7 +23,7 @@ left on the old `laufrandsen.dk` identity at that time.
 |---|---|
 | `CNAME` | the GitHub Pages custom domain — lowercase, one line, no scheme |
 | `_config.yml` | the `url:` field |
-| `index.md` | `mailto:` link, visible email text, LinkedIn URL, print-only "see webpage" link |
+| `index.md` | `mailto:` link, visible email text, print-only "see webpage" link |
 | `projects.md` | `mailto:` link and visible email text |
 
 ## Notes

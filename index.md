@@ -5,7 +5,7 @@ title: Jonas Biune Frandsen's CV
 # Jonas Biune Frandsen
 AI Engineering, Data Science, Software Development
 <div id="webaddress">
-<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/laufrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a> | Copenhagen, Denmark
+<a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a> | <a href="https://www.linkedin.com/in/biunefrandsen">My LinkedIn page</a> | <a href="tel:+4541667726">+45 41 66 77 26</a> | Copenhagen, Denmark
 <span class="print-only"><br><a href="https://laufrandsen.dk/">Viewing in PDF? See webpage for better formatting</a></span>
 </div>
 
