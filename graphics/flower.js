@@ -1,22 +1,24 @@
 // The flower: a strip of soil, and a flower that grows out of it square by square, as if it draws its
-// nourishment from the ground: every square comes in from the side of the screen, low through the
-// soil, to the stem's foot and up the stem to its place. Once per visit the soil forms, the roots
-// spread, the stem pokes through the ground, leaves unfold, the head fills in as a sunflower spiral
-// and petals grow. The flower then stays; now and then its petals break apart and fall away on the
-// wind, and a few seconds later new squares climb the stem to build new petals. Drawn by voxel.js.
+// nourishment from the ground. Every square comes in from the side of the screen, running along the
+// edge and turning in at the ground, enters the soil at its end, travels through it to the stem's foot
+// and climbs the stem to its place. Once per visit the soil forms, the roots spread, the stem pokes
+// through the ground, leaves unfold, the head fills in as a sunflower spiral and petals grow. The
+// flower then stays. Its petals live on their own: now and then one breaks apart and falls away on
+// the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
 
 import { STORY_TOTAL, rebuild, reducedMotion } from '../voxel.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
   growSeconds: 45,            // from the first soil to the first petals starting (the growth, once per visit)
-  flightSeconds: 3.5,         // how long a square takes to come in from the side of the screen to its place
+  flightSeconds: 4,           // how long a square takes to come in to its place, on average
   gravity: 3,                 // 0 = constant speed; higher = slower start, faster climb at the end
   landing: 0.35,              // share of the flight spent braking into place (0 = arrive at full speed)
-  petalGrowSeconds: 13,       // how long a set of petals takes to build
-  bloomSecondsMin: 12,        // full bloom lasts a random time between these, then the petals break apart
-  bloomSecondsMax: 25,
-  regrowSecondsMin: 5,        // new petals start building a random time between these after the break
+  petalGrowSeconds: 13,       // how long the first petals take to build, all together
+  petalRegrowSeconds: 7,      // how long a single new petal takes to build
+  bloomSecondsMin: 25,        // each petal lasts a random time between these, then breaks apart
+  bloomSecondsMax: 70,        //   (the first petals start breaking sooner, from 6 s)
+  regrowSecondsMin: 5,        // a new petal starts building a random time between these after one breaks
   regrowSecondsMax: 10,
   petalFallSeconds: 3.5,      // how long a falling petal takes to fade away
   sway: 0.035,                // how far the wind bends the flower, fraction of radius
@@ -42,7 +44,7 @@ export const CONFIG = {
 };
 
 // When each part of the flower lands during its growth, as shares of growSeconds (a square sets off
-// flightSeconds earlier). The first petals start building at the end of it.
+// a flight earlier). The first petals start building at the end of it.
 const PHASE = {
   ground: [0.03, 0.13],
   roots: [0.13, 0.33],
@@ -51,7 +53,7 @@ const PHASE = {
   head: [0.53, 0.66],
   petals: 0.66,
 };
-const PETAL_SPREAD = 1.2;     // seconds over which a set of petals lets go, petal by petal
+const MAX_PETALS = 16;
 const GROUND = -0.66;         // the soil's surface (stage units; the shader has the same)
 const SOIL_DEPTH = 0.34;
 const FOOT = -0.08;           // the stem starts this far below the ground, in stem heights
@@ -63,20 +65,21 @@ const SOIL = 0, ROOT = 1, STEM = 2, LEAF = 3, HEAD = 4, PETAL = 5, STORY = 6;
 
 const SHADER = `
 attribute vec3 aTarget;   // where the square sits once grown (stage units)
-attribute vec2 aTime;     // x = when it lands: a share of growSeconds (petals: of petalGrowSeconds,
-                          // from when the set starts); y = petals: seconds after the set breaks apart
+attribute vec2 aTime;     // x = when it lands: a share of growSeconds (petals: of their petal's build
+                          // time, from when it starts); y = petals: seconds after its petal breaks
                           // that it lets go
 attribute vec3 aInfo;     // x = part; y = stem height it branches off at (petals: which petal,
                           // soil: its ink, story: its index); z = random 0..1
 
-uniform float uGrow, uGrowSeconds, uFlight, uGravity;   // seconds since the flower began; growth; flight
-uniform float uPetalStart, uPetalGrow, uPetalFall, uFallSeconds;   // the current set of petals
+uniform float uGrow, uGrowSeconds, uFlight, uGravity, uFallSeconds;
+uniform vec4 uPetals[${MAX_PETALS}];   // per petal: x = when its squares start landing, y = when it breaks,
+                                       // z = a random seed for its fall, w = how long it takes to build
 uniform vec4 uStem;       // stem height, bend, bend phase, lean
 uniform float uPitch, uSway, uSwaySpeed, uGust;
 
 const float GROUND = ${GROUND.toFixed(3)};
 const float FOOT = ${FOOT.toFixed(3)};
-const float SCREEN_SHARE = 0.4;    // share of the way spent coming in from the side into the soil
+const float SCREEN_SHARE = 0.45;   // share of the way spent on screen, before entering the soil
 
 // The stem's centreline at height h (0 = the ground, 1 = the head; below 0 it's in the soil).
 // flower.js has the same function; keep them in step.
@@ -100,14 +103,31 @@ vec3 view(vec3 p) {
   return vec3(p.x, GROUND + y * c - p.z * s, y * s + p.z * c);
 }
 
-// Where a square sets off (device px): just off the left or right edge of the screen, at height y,
-// so it comes in through the ground rather than over the text. With the flower in the middle it
-// may be either side; with the flower off to one side (beside the CV), the nearer side.
-vec2 fromSide(float r, float y) {
+// Which side of the screen a square comes in from: either, with the flower in the middle; the
+// nearer side with the flower off to one side (beside the CV), so squares never cross the text.
+float sideOf(float r) {
   float leftShare = 1.0 - smoothstep(0.38, 0.62, uCenter.x / uResolution.x);
-  float margin = uDotSize * uRadius * 2.0 + fract(r * 3.1) * uRadius * 0.3;
-  return vec2(fract(r * 13.7) < leftShare ? -margin : uResolution.x + margin,
-              y + (fract(r * 5.7) - 0.5) * uRadius * 0.1);
+  return fract(r * 13.7) < leftShare ? -1.0 : 1.0;
+}
+
+// Where a square enters the soil: at the soil's end on its side, somewhere in its depth.
+vec3 entry(float r) {
+  return vec3(sideOf(r) * (0.78 + 0.25 * fract(r * 17.3)), GROUND - 0.03 - 0.22 * fract(r * 4.9),
+              (fract(r * 8.3) - 0.5) * 0.5);
+}
+
+// A square's way in on screen (device px) at progress p, ending where it enters the soil (at). It
+// sets off just off its side edge, anywhere from a little above the ground to below the bottom of the
+// screen, runs along the edge and turns in at the ground's height, so it never crosses the text in
+// the middle of the screen.
+vec2 wayIn(float p, float r, vec2 at) {
+  float side = sideOf(r);
+  float margin = uDotSize * uRadius * 2.0;
+  float edge = side < 0.0 ? -margin : uResolution.x + margin;
+  vec2 from = vec2(edge, mix(at.y - uRadius * 0.9, uResolution.y + uRadius * 0.3, fract(r * 23.1)));
+  vec2 turn = vec2(mix(edge, at.x, 0.25 * fract(r * 31.7)), at.y + (fract(r * 41.3) - 0.5) * uRadius * 0.08);
+  float q = 1.0 - p;
+  return q * q * from + 2.0 * q * p * turn + p * p * at;
 }
 
 // Deep in the soil under the flower, where a square's climb begins.
@@ -115,12 +135,15 @@ vec3 deep(float r) {
   return vec3(stemAt(0.0).x + (r - 0.5) * 0.5, GROUND - 0.22, (fract(r * 7.13) - 0.5) * 0.3);
 }
 
-// A square's climb at progress q (0 = deep in the soil, 1 = in place): through the soil to the
-// stem's foot, up the stem to height a where its part branches off, then out to its place.
-vec3 climb(float q, float a, vec3 target, float r) {
+// The rest of a square's way at progress q (0 = entering the soil at e, 1 = in place): through the
+// soil and under the flower to the stem's foot, up the stem to height a where its part branches off,
+// then out to its place.
+vec3 climb(float q, float a, vec3 e, vec3 target, float r) {
   vec3 d = deep(r), foot = stemAt(FOOT), branch = stemAt(a);
-  float l1 = distance(d, foot), l2 = (a - FOOT) * uStem.x, l3 = distance(branch, target) + 0.001;
-  float x = q * (l1 + l2 + l3);
+  float l0 = distance(e, d), l1 = distance(d, foot), l2 = (a - FOOT) * uStem.x, l3 = distance(branch, target) + 0.001;
+  float x = q * (l0 + l1 + l2 + l3);
+  if (x < l0) return mix(e, d, x / l0);
+  x -= l0;
   if (x < l1) return mix(d, foot, x / l1);
   x -= l1;
   if (x < l2) {
@@ -136,7 +159,7 @@ void main() {
   vec3 pos = aTarget;
   float fade = 1.0, heat = 0.0, ink = 1.0;
   vec2 start = vec2(0.0);
-  float screenMix = 1.0;     // below 1: still on its way in from a point on screen (start)
+  float screenMix = 1.0;     // below 1: on screen, between start and its place
   bool clip = true;
 
   if (part > 5.5) {
@@ -146,33 +169,35 @@ void main() {
     clip = false;
   } else {
     bool petal = part > 4.5;
-    float ta = petal ? uPetalStart + aTime.x * uPetalGrow : aTime.x * uGrowSeconds;   // lands
-    float tl = petal ? uPetalFall + aTime.y : 1e9;                                   // lets go
+    vec4 pk = petal ? uPetals[int(aInfo.y)] : vec4(0.0);
+    float ta = petal ? pk.x + aTime.x * pk.w : aTime.x * uGrowSeconds;   // lands
+    float tl = petal ? pk.y + aTime.y : 1e9;                            // lets go
+    float flight = uFlight * (0.75 + 0.5 * fract(r * 2.3));
     float t = uGrow;
-    if (t < ta - uFlight) {
+    if (t < ta - flight) {
       fade = 0.0;
     } else if (t < ta) {
-      // On its way: in from the side of the screen, low through the soil, then climbing to its place.
-      float u = (t - ta + uFlight) / uFlight;
+      // On its way in: along the side of the screen, into the soil at its end, through it and up.
+      float u = (t - ta + flight) / flight;
       float q = fallCurve(u, uGravity, uLanding);
       fade = smoothstep(0.0, 0.06, u);
-      float ps;
-      if (part < 1.5) {                 // soil and roots: straight in at their own depth
-        start = fromSide(r, project(view(aTarget), ps).y);
-        screenMix = q;
-      } else if (q < SCREEN_SHARE) {
-        pos = deep(r);
-        start = fromSide(r, project(view(pos), ps).y);
-        screenMix = q / SCREEN_SHARE;
+      vec3 e = entry(r);
+      if (q < SCREEN_SHARE) {
+        float es;
+        start = wayIn(q / SCREEN_SHARE, r, project(view(e), es));
+        screenMix = 0.0;
+        pos = e;
       } else {
-        pos = climb((q - SCREEN_SHARE) / (1.0 - SCREEN_SHARE), petal ? 1.0 : aInfo.y, aTarget, r);
+        float k = (q - SCREEN_SHARE) / (1.0 - SCREEN_SHARE);
+        pos = part < 1.5 ? mix(e, aTarget, k) : climb(k, petal ? 1.0 : aInfo.y, e, aTarget, r);
+        if (pos.y < GROUND - 0.01) ink = 0.7;   // fainter while it's inside the ground
       }
     } else if (t < tl) {
       heat = slotHeat(t - ta) * 0.3;   // softer than the orb's: many squares land at once here
     } else {
-      // Petals break apart and fall away on the wind, each as one piece, fading as they go.
+      // A petal breaks apart and falls away on the wind as one piece, fading as it goes.
       float v = (t - tl) / uFallSeconds;
-      float pr = hash(aInfo.y * 91.3 + 7.0);
+      float pr = pk.z;
       pos = aTarget
           + vec3((pr - 0.5) * 0.6 * v + 0.2 * v + sin(v * 4.0 + pr * 6.2832) * 0.05,
                  -0.9 * v * v - 0.05 * v,
@@ -181,7 +206,7 @@ void main() {
       fade = 1.0 - smoothstep(0.35, 1.0, v);
     }
     // The soil fades toward its edges; stem and head a little darker than petals and leaves.
-    ink = part < 0.5 ? aInfo.y : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
+    ink *= part < 0.5 ? aInfo.y : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
   }
 
   vec3 p = view(sway(pos));
@@ -209,7 +234,7 @@ const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1
 const sum = (...terms) => terms.reduce(addv);
 const rand = (a, b) => a + Math.random() * (b - a);
 
-// This visit's flower. Only its petals change, each time they're rebuilt.
+// This visit's flower.
 function newShape() {
   const side = Math.random() < 0.5 ? -1 : 1;
   return {
@@ -218,13 +243,10 @@ function newShape() {
     phase: Math.random() * 3,
     lean: -side * Math.random() * 0.05,
     leaves: [0.26 + Math.random() * 0.08, 0.46 + Math.random() * 0.1],
+    petals: 9 + Math.floor(Math.random() * 5),
+    petalLength: 0.28 + Math.random() * 0.06,
     side,
   };
-}
-
-// A set of petals: how many, how long.
-function newPetals() {
-  return { count: 9 + Math.floor(Math.random() * 5), length: 0.28 + Math.random() * 0.06 };
 }
 
 // The stem's centreline, as in the shader.
@@ -266,8 +288,7 @@ function makeSoil() {
   return { squares, story };
 }
 
-// Everything of the flower but its petals, each square with when it lands. Also returns the head's
-// frame, which the petals are built around.
+// The flower's squares, each with when it lands.
 function makeFlower(shape) {
   const out = [];
   const stemArrive = (h) => lerp(...PHASE.stem, (h - FOOT) / (1 - FOOT));
@@ -342,28 +363,21 @@ function makeFlower(shape) {
     const p = sum(centre, scale(e1, rr * Math.cos(a)), scale(e2, rr * Math.sin(a)), scale(facing, 0.035 * (1 - (rr / HEAD_RADIUS) ** 2)));
     out.push(square(p, lerp(...PHASE.head, rr / HEAD_RADIUS), 0, HEAD, 1));
   }
-  return { squares: out, head: { centre, facing, e1, e2 } };
-}
 
-// A set of petals around the head, cupped slightly toward the viewer. Each builds from base to tip on
-// its own schedule within the set (shares of petalGrowSeconds), and breaks apart as one piece.
-function makePetals(head, petals) {
-  const { centre, facing, e1, e2 } = head;
-  const out = [];
-  for (let k = 0; k < petals.count; k++) {
-    const phi = (k * TAU) / petals.count + (Math.random() - 0.5) * 0.2;
+  // Petals: around the head, cupped slightly toward the viewer. Each builds from base to tip over its
+  // own build time (shares of it), and later breaks apart as one piece.
+  for (let k = 0; k < shape.petals; k++) {
+    const phi = (k * TAU) / shape.petals + (Math.random() - 0.5) * 0.2;
     const along = addv(scale(e1, Math.cos(phi)), scale(e2, Math.sin(phi)));
     const side = addv(scale(e1, -Math.sin(phi)), scale(e2, Math.cos(phi)));
-    const length = petals.length * (0.92 + Math.random() * 0.16), width = 0.075;
-    const begin = Math.random() * 0.2;
-    const letGo = Math.random() * (PETAL_SPREAD - 0.1);
+    const length = shape.petalLength * (0.92 + Math.random() * 0.16), width = 0.075;
     for (let u = 0.03; u <= 1; u += 0.02 / length) {
       const w = width * Math.pow(Math.sin(Math.PI * Math.min(u * 1.06, 1)), 0.75) * (1 - 0.2 * u);
       const n = Math.max(1, Math.round((2 * w) / 0.02));
       for (let j = 0; j < n; j++) {
         const v = n === 1 ? 0 : -w + (2 * w * j) / (n - 1);
         const p = sum(centre, scale(along, HEAD_RADIUS * 0.85 + u * length), scale(side, v), scale(facing, 0.07 * u * u));
-        out.push(square(p, begin + (u * 0.92 + (Math.abs(v) / width) * 0.05) * 0.78, letGo + Math.random() * 0.1, PETAL, k));
+        out.push(square(p, u * 0.9 + (Math.abs(v) / width) * 0.08, Math.random() * 0.15, PETAL, k));
       }
     }
   }
@@ -372,77 +386,78 @@ function makePetals(head, petals) {
 
 // ---------- the squares ----------
 
-let shape = newShape();
-let soil = null, flower = null;   // made once per visit
-let petals = newPetals();
+const shape = newShape();
+let squares = null;   // made once per visit
 
-const shuffle = (a) => {
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-// Story squares first (always drawn), then the soil and flower (in a fixed shuffled order) with the
-// petals spread evenly among them, so drawing only the first k squares on a slow device still shows
-// all of it, and rebuilding the petals doesn't reshuffle the rest.
+// Story squares first (always drawn), then the soil and the flower shuffled together, so drawing
+// only the first k squares on a slow device still shows all of it.
 function build() {
-  soil ??= makeSoil();
-  flower ??= { ...makeFlower(shape), order: null };
-  flower.order ??= shuffle(soil.squares.concat(flower.squares));
-  const settled = flower.order;
-  const petalSquares = shuffle(makePetals(flower.head, petals));
-  const all = soil.story.slice();
-  const every = settled.length / Math.max(1, petalSquares.length);
-  let next = 0;
-  settled.forEach((s, i) => {
-    all.push(s);
-    while (next < petalSquares.length && i + 1 >= (next + 1) * every) all.push(petalSquares[next++]);
-  });
-  while (next < petalSquares.length) all.push(petalSquares[next++]);
-  const data = new Float32Array(all.length * 8);
-  all.forEach((s, k) => data.set(s, k * 8));
+  if (!squares) {
+    const soil = makeSoil();
+    const rest = soil.squares.concat(makeFlower(shape));
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    squares = soil.story.concat(rest);
+  }
+  const data = new Float32Array(squares.length * 8);
+  squares.forEach((s, k) => data.set(s, k * 8));
   return data;
 }
 
-// ---------- frame ----------
+// ---------- petals, each on its own schedule ----------
 
 let time = 0;       // seconds since the flower began (paused with the page)
 let gust = 0;       // a press sends a gust of wind through the flower
 
-// The current set of petals, in flower time: when its squares start landing, when it breaks apart,
-// and when the next set starts its flight.
-const petalSet = { start: 0, fall: 0, next: 0 };
+// Per petal, in flower time: when its squares start landing, how long it takes to build, when it
+// breaks apart, and when its replacement sets off. The first petals grow together at the end of the
+// growth and start breaking soon after; after that each lives on its own.
+const petals = [];
+const petalData = new Float32Array(MAX_PETALS * 4);
 
-function schedule(start) {
-  petalSet.start = start;
-  petalSet.fall = start + CONFIG.petalGrowSeconds + rand(CONFIG.bloomSecondsMin, CONFIG.bloomSecondsMax);
-  // The next set sets off once this one has fallen away.
-  const gone = PETAL_SPREAD + CONFIG.petalFallSeconds + 0.2;
-  petalSet.next = petalSet.fall + Math.max(gone, rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
+function fallenBy(p) {
+  // Its squares have all let go and faded away.
+  return p.fall + 0.15 + CONFIG.petalFallSeconds + 0.2;
 }
-schedule(PHASE.petals * CONFIG.growSeconds);
+
+function grow(p, start, build, bloom) {
+  p.start = start;
+  p.build = build;
+  p.fall = start + build + bloom;
+  p.seed = Math.random();
+  p.next = Math.max(fallenBy(p), p.fall + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
+}
+
+function firstPetals() {
+  petals.length = 0;
+  const start = PHASE.petals * CONFIG.growSeconds;
+  for (let k = 0; k < shape.petals; k++) {
+    const p = {};
+    grow(p, start + Math.random() * 0.2 * CONFIG.petalGrowSeconds, CONFIG.petalGrowSeconds, rand(6, CONFIG.bloomSecondsMax));
+    petals.push(p);
+  }
+}
+firstPetals();
 
 function frame({ dt, set }) {
-  if (!reducedMotion.matches) time += dt;
-  if (time >= petalSet.next) {
-    // New petals: new squares set off now and climb the stem.
-    petals = newPetals();
-    schedule(time + CONFIG.flightSeconds);
-    rebuild({ keepQuality: true });
+  const still = reducedMotion.matches;   // with reduced motion: the flower in full bloom, still
+  if (!still) time += dt;
+  for (const p of petals) {
+    // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb the stem.
+    if (time >= p.next) grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds, rand(CONFIG.bloomSecondsMin, CONFIG.bloomSecondsMax));
   }
+  petals.forEach((p, k) => petalData.set([p.start, still ? 1e9 : p.fall, p.seed, p.build], k * 4));
   gust *= Math.exp(-dt * 1.2);
-  // With reduced motion: the flower in full bloom, still.
-  const still = reducedMotion.matches;
-  set('uGrow', still ? petalSet.start + CONFIG.petalGrowSeconds + CONFIG.flightSeconds : time);
+
+  const firstBloom = PHASE.petals * CONFIG.growSeconds + 1.2 * CONFIG.petalGrowSeconds + CONFIG.flightSeconds;
+  set('uGrow', still ? firstBloom : time);
   set('uGrowSeconds', CONFIG.growSeconds);
   set('uFlight', Math.max(0.2, CONFIG.flightSeconds));
   set('uGravity', CONFIG.gravity);
-  set('uPetalStart', petalSet.start);
-  set('uPetalGrow', CONFIG.petalGrowSeconds);
-  set('uPetalFall', still ? 1e9 : petalSet.fall);
   set('uFallSeconds', Math.max(0.2, CONFIG.petalFallSeconds));
+  set('uPetals', petalData);
   set('uStem', [shape.height, shape.bend, shape.phase, shape.lean]);
   set('uPitch', CONFIG.pitch);
   set('uSway', still ? 0 : CONFIG.sway);
@@ -465,33 +480,36 @@ export default {
   sliders: [
     { group: 'Growing' },
     { key: 'growSeconds', label: 'Growth, soil to first petals (s)', min: 10, max: 120, step: 1 },
-    { key: 'flightSeconds', label: 'Flight in (s)', min: 0.5, max: 8, step: 0.1 },
+    { key: 'flightSeconds', label: 'Flight in (s)', min: 0.5, max: 10, step: 0.1 },
     { key: 'gravity', label: 'Gravity (slow start, fast climb)', min: 0, max: 10, step: 0.1 },
     { group: 'Petals' },
-    { key: 'petalGrowSeconds', label: 'Building petals (s)', min: 2, max: 40, step: 1 },
-    { key: 'bloomSecondsMin', label: 'Bloom lasts at least (s)', min: 2, max: 60, step: 1 },
-    { key: 'bloomSecondsMax', label: 'Bloom lasts at most (s)', min: 2, max: 90, step: 1 },
-    { key: 'regrowSecondsMin', label: 'New petals after at least (s)', min: 1, max: 30, step: 0.5 },
-    { key: 'regrowSecondsMax', label: 'New petals after at most (s)', min: 1, max: 30, step: 0.5 },
-    { key: 'petalFallSeconds', label: 'Petals falling (s)', min: 0.5, max: 8, step: 0.1 },
+    { key: 'petalGrowSeconds', label: 'First petals build (s)', min: 2, max: 40, step: 1 },
+    { key: 'petalRegrowSeconds', label: 'A new petal builds (s)', min: 1, max: 30, step: 0.5 },
+    { key: 'bloomSecondsMin', label: 'A petal lasts at least (s)', min: 2, max: 120, step: 1 },
+    { key: 'bloomSecondsMax', label: 'A petal lasts at most (s)', min: 2, max: 180, step: 1 },
+    { key: 'regrowSecondsMin', label: 'Regrows after at least (s)', min: 1, max: 30, step: 0.5 },
+    { key: 'regrowSecondsMax', label: 'Regrows after at most (s)', min: 1, max: 30, step: 0.5 },
+    { key: 'petalFallSeconds', label: 'Petal falling (s)', min: 0.5, max: 8, step: 0.1 },
     { group: 'Wind and view' },
     { key: 'sway', label: 'Sway', min: 0, max: 0.15, step: 0.005 },
     { key: 'swaySpeed', label: 'Wind speed', min: 0.1, max: 3, step: 0.05 },
     { key: 'pitch', label: 'Looking down', min: 0, max: 0.8, step: 0.01 },
     { group: 'Soil' },
-    { key: 'soilCount', label: 'Squares below the surface', min: 0, max: 4000, step: 100, apply: () => { soil = null; flower.order = null; rebuild(); } },
+    { key: 'soilCount', label: 'Squares below the surface', min: 0, max: 4000, step: 100, apply: () => { squares = null; rebuild(); } },
   ],
   actions: {
-    'Grow again': () => { time = 0; schedule(PHASE.petals * CONFIG.growSeconds); },
-    'Petals fall now': () => {
-      if (time > petalSet.start + CONFIG.flightSeconds) {
-        petalSet.next += time - petalSet.fall;
-        petalSet.fall = time;
-      }
+    'Grow again': () => { time = 0; firstPetals(); },
+    // Breaks one petal that's in full bloom right now.
+    'Break a petal': () => {
+      const blooming = petals.filter((p) => time > p.start + p.build && time < p.fall);
+      const p = blooming[Math.floor(Math.random() * blooming.length)];
+      if (!p) return;
+      p.fall = time;
+      p.next = Math.max(fallenBy(p), time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
     },
     'Full bloom': () => {
-      time = Math.max(time, petalSet.start + CONFIG.petalGrowSeconds + 0.5);
-      if (petalSet.fall < time + 5) schedule(time - CONFIG.petalGrowSeconds - 0.5);
+      time = Math.max(time, Math.max(...petals.map((p) => p.start + p.build)) + 0.5);
+      for (const p of petals) if (p.fall < time + 3) grow(p, time - p.build - 0.5, p.build, rand(6, CONFIG.bloomSecondsMax));
     },
   },
 };
