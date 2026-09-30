@@ -99,7 +99,9 @@ a:focus-visible, button:focus-visible {
   --horizon-clip: 0.8;
   position: fixed;
   left: 50%;
-  top: calc(100dvh + var(--horizon-size) / 2 - var(--horizon-band));
+  /* 100% = the bottom of the same fixed layer the canvas and #paper-fade fill, so the three stay
+     together while a phone's address bar slides in and out. */
+  top: calc(100% + var(--horizon-size) / 2 - var(--horizon-band));
   width: var(--horizon-size);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
@@ -166,14 +168,14 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(3rem, 11dvh, 7rem);
+  gap: clamp(3rem, 11svh, 7rem);
   padding: var(--gutter);
   padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 60px);   /* room for the scroll cue */
   pointer-events: none;   /* taps and hovers reach the orb canvas underneath */
 }
 
 .orb-slot {
-  width: min(68vw, 52dvh, 520px);
+  width: min(68vw, 52svh, 520px);   /* svh, not dvh: stays put while a phone's address bar hides */
   aspect-ratio: 1;
 }
 
@@ -255,7 +257,10 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
 .cv > * { pointer-events: auto; }
 
 @media (max-width: 1099px) {
-  .cv { padding-bottom: calc(30dvh + 3rem); }   /* the footer can scroll clear of the horizon's fade */
+  .cv {   /* the footer can scroll clear of the horizon's fade, even with the address bar hidden */
+    padding-bottom: calc(30vh + 3rem);
+    padding-bottom: calc(30lvh + 3rem);
+  }
 }
 
 @media (min-width: 1100px) {
