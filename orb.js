@@ -59,6 +59,7 @@ const slot = document.getElementById('orb-slot');
 const restEl = document.getElementById('orb-rest');
 const focusEl = document.getElementById('orb-focus');
 const haloEl = document.getElementById('orb-halo');
+const paperFadeEl = document.getElementById('paper-fade');
 const heroEl = slot.closest('header') || slot;
 
 // Story dots: a small cluster per CV entry, always drawn (kept at the front of the buffer).
@@ -135,6 +136,7 @@ uniform vec3 uStoryColor[${STORY_ENTRIES}];
 uniform float uStoryFall, uStoryGlow, uStoryIntegrate;
 uniform vec4 uRipple[${RIPPLES}];   // recent slot-ins: xyz = where (unit vector), w = when (seconds, uTime)
 uniform float uRippleStrength, uRippleSpeed, uRippleSeconds;
+uniform float uClipY, uClipFade;   // the horizon: all but story dots fade out above uClipY (device px)
 uniform vec3 uColor;
 
 // Loose pseudo-random hash; GPUs disagree on its exact value, so it only drives looks. Anything orb.js
@@ -250,7 +252,8 @@ void main() {
     vec2 dir = vec2(cos(fh1 * 6.2832), sin(fh1 * 6.2832));
     vec2 room = vec2(dir.x > 0.0 ? uResolution.x - uCenter.x : uCenter.x,
                      dir.y > 0.0 ? uResolution.y - uCenter.y : uCenter.y);
-    float edge = min(room.x / max(abs(dir.x), 0.001), room.y / max(abs(dir.y), 0.001));
+    // (At least just outside the orb: resting on the horizon, its centre is below the screen.)
+    float edge = max(min(room.x / max(abs(dir.x), 0.001), room.y / max(abs(dir.y), 0.001)), uRadius * 1.1);
     fallStart = uCenter + dir * (edge + uDotSize * uRadius);
 
     // After the ball is pressed: cycles that would start during the pause are skipped (no new
@@ -354,6 +357,8 @@ void main() {
   float rim = 1.0 - abs(zn);
   vAlpha = (clamp(0.08 + 0.8 * pow(depth, 1.6) + 0.1 * rim * rim + lift * 0.6 + uEnergy * 0.1, 0.0, 1.0)
          + heat * (0.3 + 0.7 * depth)) * uBrightness * looseDim * fade * (1.0 + rippleInk);
+  // On the horizon, keep the text above it clear; story dots may still fall through it into the orb.
+  if (aSeed < 3.0) vAlpha *= smoothstep(uClipY - uClipFade, uClipY, screen.y);
 
   // Pull and heat widen the burn, not the square: the sprite grows and the square's share shrinks.
   float grow = 1.0 + lift * 0.8 + heat * 0.8;
@@ -485,7 +490,7 @@ function init() {
     'uDotSize', 'uSquare', 'uColor', 'uBurn', 'uBurnColor', 'uPullGlow', 'uLooseSpread', 'uLooseDrift', 'uLooseVoice',
     'uFlowTime', 'uFlowSeconds', 'uFlowLinger', 'uGravity', 'uLanding', 'uFlowSwirl', 'uSlotGlow', 'uAfterglow',
     'uGatherStart', 'uGatherEnd', 'uGatherSeconds', 'uGatherJitter', 'uStory', 'uStoryColor', 'uStoryFall', 'uStoryGlow', 'uStoryIntegrate',
-    'uRipple', 'uRippleStrength', 'uRippleSpeed', 'uRippleSeconds']) {
+    'uRipple', 'uRippleStrength', 'uRippleSpeed', 'uRippleSeconds', 'uClipY', 'uClipFade']) {
     uniforms[name] = gl.getUniformLocation(program, name);
   }
 
@@ -499,15 +504,21 @@ function init() {
 
 // CSS decides both ends of the scroll glide: #orb-slot in the hero (measured at scroll 0) and the
 // fixed, invisible #orb-rest (its --rest-brightness sets how dim the orb gets behind the CV).
+// On narrower screens #orb-rest sits on the bottom edge as a horizon: its --horizon-clip (a share of
+// the screen height) hides loose and flowing squares above that line, a copy of the paper
+// (#paper-fade) fades the text out just above the orb, and once settled the orb is lifted above the
+// text (html.horizon) so the text can't run over it.
 let dpr = 1, maxDpr = 2, cx = 0, cy = 0, radius = 100;
 const hero = { x: 0, y: 0, r: 100 };
-const rest = { x: 0, y: 0, r: 100, brightness: 1 };
+const rest = { x: 0, y: 0, r: 100, brightness: 1, clip: 0 };
 const focusPose = { x: 0, y: 0, r: 100, brightness: 1 };
 let heroSpan = 1;     // CSS px of scrolling over which the orb glides to its rest position
 let recede = 0;       // 0 = in the hero, 1 = at rest behind the CV
 let focusTarget = 0;  // 1 while something (e.g. a project pane) has the orb's attention
 let focus = 0;        // eased towards focusTarget
 let dim = 1;          // brightness multiplier from scrolling and focus
+let clipY = 0;        // device px from the top: loose and flowing squares above it fade out
+let horizon = false;  // the orb has settled on the horizon and sits above the text
 
 function measure(el, into, brightnessVar) {
   const r = el.getBoundingClientRect();
@@ -525,8 +536,12 @@ function layout() {
   hero.x = (box.left + box.width / 2) * dpr;
   hero.y = (box.top + scrollY + box.height / 2) * dpr;
   hero.r = (box.width / 2) * dpr;
-  if (restEl) measure(restEl, rest, '--rest-brightness');
-  else Object.assign(rest, hero, { brightness: 1 });
+  if (restEl) {
+    measure(restEl, rest, '--rest-brightness');
+    rest.clip = parseFloat(getComputedStyle(restEl).getPropertyValue('--horizon-clip')) || 0;
+  } else {
+    Object.assign(rest, hero, { brightness: 1, clip: 0 });
+  }
   if (focusEl) measure(focusEl, focusPose, '--focus-brightness');
   else Object.assign(focusPose, rest);
   heroSpan = Math.max(1, heroEl.offsetHeight * 0.85);
@@ -550,6 +565,19 @@ function placeOrb() {
   radius += (focusPose.r - radius) * f;
   radius *= 1 + 0.1 * 4 * f * (1 - f);
   dim += (focusPose.brightness - dim) * f;
+
+  // The horizon's clip line comes down from the top of the screen as the orb settles, and lifts
+  // while it glides up to a project pane.
+  clipY = rest.clip * recede * (1 - f) * canvas.height;
+  const settled = rest.clip > 0 && recede > 0.999;
+  if (settled !== horizon) {
+    horizon = settled;
+    document.documentElement.classList.toggle('horizon', horizon);
+  }
+  if (paperFadeEl) {
+    const opacity = rest.clip > 0 ? recede.toFixed(3) : '0';
+    if (paperFadeEl.style.opacity !== opacity) paperFadeEl.style.opacity = opacity;
+  }
 }
 
 // Glides the orb to its focus position (and draws in the falling dots), or back again.
@@ -800,6 +828,8 @@ function frame(nowMs) {
   gl.uniform1f(uniforms.uRippleStrength, CONFIG.rippleStrength);
   gl.uniform1f(uniforms.uRippleSpeed, CONFIG.rippleSpeed);
   gl.uniform1f(uniforms.uRippleSeconds, Math.max(0.1, CONFIG.rippleSeconds));
+  gl.uniform1f(uniforms.uClipY, clipY);
+  gl.uniform1f(uniforms.uClipFade, canvas.height * 0.1);
   gl.uniform3fv(uniforms.uColor, CONFIG.color);
   gl.drawArrays(gl.POINTS, 0, activeCount);
 

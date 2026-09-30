@@ -13,7 +13,7 @@ Then open http://localhost:8080. Add `?tune` (http://localhost:8080/?tune) for a
 ## Files
 
 - `index.html`: all CV content. Each experience/project entry with `data-drop` sends dots into the orb when it scrolls into view: in ink, or in the entry's `--dot` colour if one is set (e.g. `style="--dot: #8a3b1e"`).
-- `style.css`: colour tokens (paper, ink, burn) at the top, layout, phone breakpoints and the print/PDF version.
+- `style.css`: colour tokens (paper, ink, burn) at the top, layout, phone breakpoints and the print/PDF version. `.orb-rest` sets where the orb rests once scrolled: beside the text from 1100px, and below that on the bottom edge as a "horizon", with the text fading into the paper (`.paper-fade`) just above it.
 - `orb.js`: the orb (WebGL). All tunable values are in `CONFIG` at the top.
 - `page.js`: section reveals, entry dots, project panes, PDF button.
 - `tune.js`: the `?tune` panel.
@@ -26,7 +26,7 @@ Why it's limited today:
 
 - There is no hover on touch screens, so the pointer pull (dots drawn toward the cursor) only happens while a finger is down.
 - A swipe that starts on the orb has to scroll the page (`touch-action: pan-y`), so dragging across the orb scrolls instead of playing with it.
-- Once scrolled, the orb sits dimmed behind the text, where touches go to the text.
+- Once scrolled, the orb rests on the bottom edge as a horizon. It sits above the text there but lets touches through (`pointer-events: none`), so the page stays usable; it can't be touched either.
 
 Research: look at how sites with large hero visuals, 3D scenes or canvas animations handle this on phones, and what makes them feel responsive. Ideas to evaluate:
 

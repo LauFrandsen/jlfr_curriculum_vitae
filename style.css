@@ -1,5 +1,6 @@
 :root {
   --bg: #f5f2ea;                      /* the paper: off-white with a trace of cream */
+  --paper: radial-gradient(circle at 50% 45%, #faf8f3 0%, #f5f2ea 45%, #ece7dc 100%);
   --raised: rgba(250, 248, 243, 0.88); /* windows laid on the paper */
   --ink: #11100f;                     /* a warm black, the same ink as the orb */
   --burn: #3a2614;                    /* scorch around ink squares: near-black with a trace of umber */
@@ -61,7 +62,7 @@ a:focus-visible, button:focus-visible {
   position: fixed;
   inset: 0;
   z-index: -3;
-  background: radial-gradient(circle at 50% 45%, #faf8f3 0%, #f5f2ea 45%, #ece7dc 100%);
+  background: var(--paper);
 }
 
 /* A faint scorch on the paper around the orb; orb.js centres and scales it on the orb every frame. */
@@ -87,13 +88,19 @@ a:focus-visible, button:focus-visible {
   touch-action: pan-y;   /* the page must still scroll when a swipe starts on the orb */
 }
 
-/* Where the orb rests behind the CV once scrolled. Invisible; orb.js reads its box. */
+/* Where the orb rests once scrolled. Invisible; orb.js reads its box.
+   Below 1100px there's no room beside the text, so it sinks to the bottom edge like a horizon:
+   centred below the screen so only its top --horizon-band shows. Loose and flowing squares above
+   --horizon-clip (a share of the screen height) fade out, and #paper-fade fades the text out above it. */
 .orb-rest {
-  --rest-brightness: 0.22;
+  --rest-brightness: 0.8;
+  --horizon-size: min(118vw, 700px);
+  --horizon-band: 16svh;
+  --horizon-clip: 0.8;
   position: fixed;
   left: 50%;
-  top: 50%;
-  width: min(92vw, 70svh);
+  top: calc(100dvh + var(--horizon-size) / 2 - var(--horizon-band));
+  width: var(--horizon-size);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   visibility: hidden;
@@ -103,9 +110,29 @@ a:focus-visible, button:focus-visible {
 @media (min-width: 1100px) {
   .orb-rest {
     --rest-brightness: 0.5;
+    --horizon-clip: 0;
     left: 74%;
+    top: 50%;
     width: min(40vw, 72svh);
   }
+}
+
+/* The horizon's fade: a copy of the paper, shown only along the bottom, laid over the text but
+   under the orb. orb.js fades it in as the orb settles and lifts the orb above the text (.horizon). */
+.paper-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--paper);
+  -webkit-mask-image: linear-gradient(to top, #000 15%, transparent 30%);
+  mask-image: linear-gradient(to top, #000 15%, transparent 30%);
+  opacity: 0;
+  pointer-events: none;
+}
+html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
+
+@media (min-width: 1100px) {
+  .paper-fade { display: none; }
 }
 
 /* Where the orb glides while a project pane is open: beside the pane on desktop, above the sheet on phones. */
@@ -226,6 +253,10 @@ a:focus-visible, button:focus-visible {
   counter-reset: section;
 }
 .cv > * { pointer-events: auto; }
+
+@media (max-width: 1099px) {
+  .cv { padding-bottom: calc(30dvh + 3rem); }   /* the footer can scroll clear of the horizon's fade */
+}
 
 @media (min-width: 1100px) {
   .cv {
@@ -683,7 +714,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .orb-halo, #orb-canvas, .orb-rest, .orb-focus, .hero, .pdf-button, .print-hide, .tune-panel,
+  .void, .orb-halo, #orb-canvas, .paper-fade, .orb-rest, .orb-focus, .hero, .pdf-button, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }
