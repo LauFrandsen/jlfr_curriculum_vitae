@@ -1,36 +1,43 @@
-// Orb of thousands of glowing dots, rendered with WebGL so all per-dot work runs on the GPU.
+// Orb of thousands of small ink squares, each with a soft scorch ("burn") around it, drawn as ink
+// on the page's paper with WebGL so all per-dot work runs on the GPU.
 // A still, breathing shell inside a drifting cloud, with dots flowing in from beyond the screen
 // edges, settling into the orb and drifting back out. Pressing the ball draws the falling dots in
-// and pauses new ones. As the page scrolls, the orb glides from the hero (#orb-slot) to a dimmer
+// and pauses new ones. As the page scrolls, the orb glides from the hero (#orb-slot) to a fainter
 // background position (#orb-rest), and CV entries can send "story" dots into it (dropFrom).
+// Each square that slots in sends a faint ripple over the squares around it.
 // Optional simulated "speech"; gentle pointer pull.
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
-  dotCount: 14500,            // dots in the shell
+  dotCount: 6000,             // dots in the shell
   minDotCount: 1500,
-  color: [0.302, 0.698, 1.0], // light "internet" blue (#4db2ff)
+  color: [0.067, 0.063, 0.059],   // ink of the squares (#11100f, a warm black)
+  burnColor: [0.13, 0.085, 0.05], // ink of the scorch around them: near-black with a trace of umber
   breathSeconds: 14,          // one full in-and-out breath
   breathDepth: 0.025,         // how much the orb grows at the top of a breath, fraction of radius
   tilt: 0,                    // radians around the X axis; the orb doesn't spin, this just sets the viewing angle
   cameraDistance: 6.4,        // in orb radii; lower = stronger perspective
-  dotSize: 0.038,             // sprite diameter (core + glow) as a fraction of the orb radius
-  glow: 0.35,                 // strength of each dot's soft halo
-  brightness: 0.9,            // overall dot brightness multiplier
+  dotSize: 0.042,             // sprite size (square + burn) as a fraction of the orb radius
+  squareSize: 0.18,           // the solid square, as a share of the sprite
+  burn: 0.55,                 // strength of the scorch around each square
+  brightness: 1,              // overall ink strength
   flowCount: 100,             // dots that fall in from the screen edges into their own slot in the orb
   flowSeconds: 60,            // average length of one cycle: fall in, rest, drift out and fade
   flowLinger: 0.45,           // share of the cycle spent resting in the slot
   gravity: 8,                 // 0 = constant speed; higher = slower drift at first, faster pull at the end
   landing: 0.35,              // share of the fall spent braking into the slot (0 = arrive at full speed)
   flowSwirl: 0.35,            // how far (radians) the path curls around the orb on the way in
-  slotGlow: 2,                // brightness of the flash when a dot slots in
-  afterglowSeconds: 2.5,      // how long a softer glow lingers after the flash
+  slotGlow: 2,                // strength of the dark flare of burn when a dot slots in
+  afterglowSeconds: 2.5,      // how long a softer burn lingers after the flare
   gatherSeconds: 1.5,         // pressing the ball: how long the falling dots take to be drawn in
   gatherJitter: 0.2,          // pressing the ball: arrivals are spread randomly over this many extra seconds
   respawnDelay: 5,            // pressing the ball: seconds before new dots start falling again
   storyFallSeconds: 2.4,      // CV entries: how long an entry's dots take to fall into the orb
-  storyGlow: 0.35,            // CV entries: how much brighter their dots stay once slotted in
-  storyIntegrateSeconds: 4,   // CV entries: how long their own colour takes to blend into the orb's blue
+  storyGlow: 0.35,            // CV entries: how much stronger their dots stay once slotted in
+  storyIntegrateSeconds: 4,   // CV entries: how long their own colour takes to blend into the orb's ink
+  rippleStrength: 0.004,      // how far a slotting-in square nudges the squares around it, fraction of radius (0 = off)
+  rippleSpeed: 0.3,           // how fast the ripple spreads over the surface, orb radii per second
+  rippleSeconds: 1.6,         // how long a ripple lasts before it has faded out
   speech: 0,                  // 0 = no simulated speech, 1 = full; scales everything below it
   voiceAmplitude: 0.035,      // core shell swell while "speaking", fraction of radius
   voiceSpeed: 1,              // how fast the lumps travel over the surface
@@ -38,13 +45,13 @@ export const CONFIG = {
   burstSeconds: 4.5,          // average length of a speaking burst
   pauseSeconds: 3.2,          // average silence between bursts
   responsiveness: 8,          // how quickly the swell rises to each syllable (it fades at half this rate)
-  looseFraction: 0.48,        // extra loose dots outside the shell, as a share of dotCount
+  looseFraction: 0.3,         // extra loose dots outside the shell, as a share of dotCount
   looseSpread: 0.36,          // how far out the outermost loose dots sit, fraction of radius
   looseDrift: 0.165,          // how much each loose dot wanders on its own
   looseVoice: 0.49,           // how far speech pushes the loose dots outward
   pullRadius: 0.2,            // pointer influence radius, fraction of orb radius
   pullStrength: 0.22,         // how far toward the pointer a dot travels at full influence
-  pullGlow: 0.02,             // how much pulled dots brighten and grow (0 = none)
+  pullGlow: 0.02,             // how much pulled dots darken and burn wider (0 = none)
 };
 
 const canvas = document.getElementById('orb-canvas');
@@ -58,6 +65,8 @@ const heroEl = slot.closest('header') || slot;
 const STORY_ENTRIES = 12;
 const STORY_DOTS = 6;
 const STORY_TOTAL = STORY_ENTRIES * STORY_DOTS;
+// Ripples: the most recent slot-ins, each spreading out from where its square landed.
+const RIPPLES = 16;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const gl = canvas.getContext('webgl', { alpha: true, antialias: false, premultipliedAlpha: true });
@@ -117,16 +126,22 @@ attribute float aSeed;    // 0..1 shell, 1..2 loose, 2..3 flowing, 3..4 story
 
 uniform float uTime, uVoiceTime, uBreath, uTilt, uEnergy, uVoiceAmp, uCamera, uBrightness;
 uniform vec2 uCenter, uResolution, uPointer;
-uniform float uRadius, uPointerStrength, uPullRadius, uPullStrength, uPullGlow, uDotSize;
+uniform float uRadius, uPointerStrength, uPullRadius, uPullStrength, uPullGlow, uDotSize, uSquare;
 uniform float uLooseSpread, uLooseDrift, uLooseVoice;
 uniform float uFlowTime, uFlowSeconds, uFlowLinger, uGravity, uLanding, uFlowSwirl, uSlotGlow, uAfterglow;
 uniform float uGatherStart, uGatherEnd, uGatherSeconds, uGatherJitter;
 uniform vec4 uStory[${STORY_ENTRIES}];   // per CV entry: xy = start (device px), z = drop time, w = 1 once dropped
 uniform vec3 uStoryColor[${STORY_ENTRIES}];
 uniform float uStoryFall, uStoryGlow, uStoryIntegrate;
+uniform vec4 uRipple[${RIPPLES}];   // recent slot-ins: xyz = where (unit vector), w = when (seconds, uTime)
+uniform float uRippleStrength, uRippleSpeed, uRippleSeconds;
 uniform vec3 uColor;
 
+// Loose pseudo-random hash; GPUs disagree on its exact value, so it only drives looks. Anything orb.js
+// must predict (when a dot slots in, for its ripple) uses exact() instead: simple float maths every
+// GPU computes the same way as JavaScript's Math.fround.
 float hash(float x) { return fract(sin(x) * 43758.5453); }
+float exact(float x, float m) { return fract(x * m); }
 vec2 rot(vec2 v, float a) { float c = cos(a), sn = sin(a); return vec2(c * v.x - sn * v.y, sn * v.x + c * v.y); }
 
 // Fall progress (0 = screen edge, 1 = slot) over normalised fall time u. Gravity g makes it
@@ -142,10 +157,34 @@ float fallCurve(float u, float g, float L) {
 }
 
 varying float vAlpha;
-varying float vLift;
+varying float vHalf;     // half-width of the solid square, in sprite units (sprite edge = 1)
+varying float vPixel;    // one device pixel, in sprite units
 varying vec3 vColor;
 
 ${NOISE}
+
+// Ripples on the surface around recent slot-ins, at unit direction d: a single crest and trough
+// spreading outward, nudging dots along the surface (plus a whisper outward) and darkening the crest.
+// Returns the displacement in orb radii (xyz) and extra ink (w).
+vec4 ripple(vec3 d) {
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < ${RIPPLES}; i++) {
+    vec4 r = uRipple[i];
+    float age = uTime - r.w;
+    if (age < 0.0 || age > uRippleSeconds) continue;
+    vec3 toward = r.xyz - d;
+    float x = (length(toward) - age * uRippleSpeed) / 0.06;
+    float wave = sin(x * 2.2) * exp(-x * x);
+    float life = 1.0 - age / uRippleSeconds;
+    wave *= life * life * smoothstep(0.0, 0.12, age);
+    vec3 along = toward - d * dot(toward, d);
+    float len = length(along);
+    if (len > 1e-4) sum.xyz -= along / len * wave;
+    sum.xyz += d * wave * 0.4;
+    sum.w += max(wave, 0.0);
+  }
+  return vec4(sum.xyz * uRippleStrength, sum.w * uRippleStrength * 30.0);
+}
 
 void main() {
   vec3 pos;
@@ -162,7 +201,7 @@ void main() {
   if (aSeed >= 3.0) {
     // Story dot: a small cluster per CV entry. When the entry scrolls into view its dots leave
     // the entry's marker in the entry's own colour, fall into the orb, and once slotted in
-    // slowly take on the orb's blue ("integrate"), staying a little brighter than the rest.
+    // slowly take on the orb's ink ("integrate"), staying a little stronger than the rest.
     float idx = floor((aSeed - 3.0) * ${STORY_TOTAL.toFixed(1)});
     float entry = floor(idx / ${STORY_DOTS.toFixed(1)});
     float sub = idx - entry * ${STORY_DOTS.toFixed(1)};
@@ -170,7 +209,7 @@ void main() {
     vColor = uStoryColor[int(entry)];
     fk = idx / 97.0;
     fh2 = hash(idx * 7.7 + 4.0);
-    float t = uTime - story.z - sub * 0.18 - hash(idx * 3.3) * 0.12;
+    float t = uTime - story.z - sub * 0.18 - exact(idx, 0.618034) * 0.12;
     pos = aPos;
     wobbleAmt = 0.03;
     if (story.w < 0.5 || t < 0.0) {
@@ -190,12 +229,13 @@ void main() {
   } else if (aSeed >= 2.0) {
     // Flowing dot. Each has a reserved slot in the shell. Cycle: fall in from the screen edge
     // as if pulled by gravity (barely moving at first, speeding up as it nears, braking into
-    // the slot), flash and glow, rest, then quietly drift outward and fade before starting again.
+    // the slot), flare with burn, rest, then quietly drift outward and fade before starting again.
+    // Cycle length, phase and gather delay come from exact() so orb.js can tell when it slots in.
     fk = aSeed - 2.0;
     fh1 = hash(fk * 91.7);
-    fh2 = hash(fk * 37.3 + 1.0);
+    fh2 = exact(fk, 61.0);
     float h3 = hash(fk * 13.1 + 2.0);
-    float cycle = uFlowSeconds * (0.7 + 0.6 * fh1);
+    float cycle = uFlowSeconds * (0.7 + 0.6 * fk);
     float phase = fract(uFlowTime / cycle + fh2);
     float cycleStart = uFlowTime - phase * cycle;
     float fallEnd = (1.0 - uFlowLinger) * 0.65;
@@ -226,7 +266,7 @@ void main() {
       fade = 1.0 - smoothstep(0.0, 1.0, e);
     } else if (gathered) {
       // Each dot gets its own small extra delay so the arrivals ripple in rather than land in unison.
-      float gatherTime = uGatherSeconds + hash(fk * 53.9 + 3.0) * uGatherJitter;
+      float gatherTime = uGatherSeconds + exact(fk, 29.0) * uGatherJitter;
       float x = (uFlowTime - uGatherStart) / gatherTime;
       if (x < 1.0) {
         float u0 = (uGatherStart - cycleStart) / fallTime;
@@ -245,7 +285,7 @@ void main() {
       landed = (phase - fallEnd) * cycle;
     }
 
-    // Slot-in: a bright flash, then a softer afterglow that fades into the rest of the shell.
+    // Slot-in: a dark flare of burn, then a softer afterglow that fades into the rest of the shell.
     if (landed >= 0.0) {
       heat = uSlotGlow * (0.65 * exp(-landed * 3.0) + 0.35 * (1.0 - smoothstep(0.0, uAfterglow, landed)));
     }
@@ -270,6 +310,14 @@ void main() {
     float voice = snoise(aPos * 1.3 + vec3(0.0, uVoiceTime * 0.9, uVoiceTime * 0.5)) * 0.8
                 + snoise(aPos * 2.6 - vec3(uVoiceTime * 1.4)) * 0.2;
     pos = aPos * (1.0 + (aSeed - 0.5) * 0.04 + idle + uEnergy * uVoiceAmp * voice);
+  }
+
+  // Ripples from squares slotting in nearby move the shell and the dots resting in their slots.
+  float rippleInk = 0.0;
+  if (aSeed < 1.0 || (aSeed >= 2.0 && !falling)) {
+    vec4 rp = ripple(aPos);
+    pos += rp.xyz;
+    rippleInk = rp.w;
   }
   pos *= uBreath;
 
@@ -301,35 +349,41 @@ void main() {
   float influence = w * w * (3.0 - 2.0 * w) * (0.35 + 0.65 * depth) * uPointerStrength;
   screen += toPointer * influence * uPullStrength;
   float lift = influence * uPullGlow;
-  vLift = lift + heat;
 
-  // Front dots bright, back dots dim; the rim gets a little extra so the silhouette glows.
+  // Front dots dark, back dots faint; the rim gets a little extra so the silhouette reads.
   float rim = 1.0 - abs(zn);
-  vAlpha = (clamp(0.08 + 0.8 * pow(depth, 1.6) + 0.25 * rim * rim + lift * 0.6 + uEnergy * 0.1, 0.0, 1.0)
-         + heat * (0.3 + 0.7 * depth)) * uBrightness * looseDim * fade;
+  vAlpha = (clamp(0.08 + 0.8 * pow(depth, 1.6) + 0.1 * rim * rim + lift * 0.6 + uEnergy * 0.1, 0.0, 1.0)
+         + heat * (0.3 + 0.7 * depth)) * uBrightness * looseDim * fade * (1.0 + rippleInk);
 
-  gl_PointSize = uDotSize * uRadius * 2.0 * s * (0.55 + 0.65 * depth) * (1.0 + lift * 0.8 + heat * 0.8)
-               * mix(0.6, 1.0, looseDim);
+  // Pull and heat widen the burn, not the square: the sprite grows and the square's share shrinks.
+  float grow = 1.0 + lift * 0.8 + heat * 0.8;
+  gl_PointSize = uDotSize * uRadius * 2.0 * s * (0.55 + 0.65 * depth) * grow * mix(0.6, 1.0, looseDim);
+  vHalf = uSquare / grow;
+  vPixel = 2.0 / max(gl_PointSize, 1.0);
   gl_Position = vec4(screen / uResolution * 2.0 - 1.0, 0.0, 1.0);
   gl_Position.y = -gl_Position.y;
 }`;
 
 const FRAGMENT = `
 precision mediump float;
-uniform float uGlow;
+uniform float uBurn;
+uniform vec3 uBurnColor;
 varying float vAlpha;
-varying float vLift;
+varying float vHalf;
+varying float vPixel;
 varying vec3 vColor;
 
 void main() {
-  float d = length(gl_PointCoord - 0.5) * 2.0;
-  if (d > 1.0) discard;
-  // Small bright core inside a wide soft halo.
-  float core = smoothstep(0.22, 0.0, d);
-  float glow = exp(-d * d * 5.0) * (1.0 - d);
-  vec3 col = mix(vColor, vec3(0.92, 0.97, 1.0), core * (0.6 + vLift * 0.4));
-  float a = (core * 0.85 + glow * uGlow) * vAlpha;
-  gl_FragColor = vec4(col * a, a);   // premultiplied, blended additively
+  vec2 p = abs(gl_PointCoord - 0.5) * 2.0;   // 0 at the centre, 1 at the sprite's edge
+  // A crisp square of ink, antialiased over one device pixel.
+  float square = 1.0 - smoothstep(vHalf - vPixel * 0.5, vHalf + vPixel * 0.5, max(p.x, p.y));
+  // The burn: a scorch that is darkest where it touches the square and falls away fast,
+  // rounding off towards the corners.
+  float d = length(max(p - vHalf, 0.0)) / max(1.0 - vHalf, 0.001);
+  float burn = exp(-d * 5.0) * (1.0 - smoothstep(0.5, 1.0, d)) * uBurn;
+  float a = clamp(mix(burn, 1.0, square) * vAlpha, 0.0, 1.0);
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(mix(uBurnColor, vColor, square) * a, a);   // premultiplied ink, laid over the paper
 }`;
 
 // ---------- setup ----------
@@ -378,11 +432,29 @@ function makeDots(shellCount, looseCount, flowCount) {
   const all = story.concat(dots);
   const data = new Float32Array(all.length * 4);
   all.forEach((d, k) => data.set(d, k * 4));
+
+  // Keep the slots of the dots that slot in, read back from the Float32 data exactly as the shader
+  // sees them, so each landing can be predicted (flowLandings) and sent out as a ripple.
+  storySlots = data.subarray(0, STORY_TOTAL * 4);
+  flowSlots = [];
+  for (let i = STORY_TOTAL; i < all.length; i++) {
+    const seed = data[i * 4 + 3];
+    if (seed < 2 || seed >= 3) continue;
+    const k = seed - 2;
+    flowSlots.push({ index: i, dir: data.subarray(i * 4, i * 4 + 3), k, phase: exact(k, 61), gatherDelay: exact(k, 29) });
+  }
   return data;
+}
+
+// The shader's exact(): fract(x * m) in 32-bit floats.
+function exact(x, m) {
+  const v = Math.fround(Math.fround(x) * Math.fround(m));
+  return v - Math.floor(v);
 }
 
 let program, uniforms = {};
 let dotCount = 0, activeCount = 0;
+let storySlots = new Float32Array(0), flowSlots = [];
 
 export function setDotCount(n) {
   const loose = Math.round(n * CONFIG.looseFraction);
@@ -410,15 +482,16 @@ function init() {
 
   for (const name of ['uTime', 'uVoiceTime', 'uBreath', 'uTilt', 'uEnergy', 'uVoiceAmp', 'uCamera', 'uBrightness',
     'uCenter', 'uResolution', 'uPointer', 'uRadius', 'uPointerStrength', 'uPullRadius', 'uPullStrength',
-    'uDotSize', 'uColor', 'uGlow', 'uPullGlow', 'uLooseSpread', 'uLooseDrift', 'uLooseVoice',
+    'uDotSize', 'uSquare', 'uColor', 'uBurn', 'uBurnColor', 'uPullGlow', 'uLooseSpread', 'uLooseDrift', 'uLooseVoice',
     'uFlowTime', 'uFlowSeconds', 'uFlowLinger', 'uGravity', 'uLanding', 'uFlowSwirl', 'uSlotGlow', 'uAfterglow',
-    'uGatherStart', 'uGatherEnd', 'uGatherSeconds', 'uGatherJitter', 'uStory', 'uStoryColor', 'uStoryFall', 'uStoryGlow', 'uStoryIntegrate']) {
+    'uGatherStart', 'uGatherEnd', 'uGatherSeconds', 'uGatherJitter', 'uStory', 'uStoryColor', 'uStoryFall', 'uStoryGlow', 'uStoryIntegrate',
+    'uRipple', 'uRippleStrength', 'uRippleSpeed', 'uRippleSeconds']) {
     uniforms[name] = gl.getUniformLocation(program, name);
   }
 
   gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
-  gl.blendFunc(gl.ONE, gl.ONE);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // ink over paper: overlapping dots darken
   gl.clearColor(0, 0, 0, 0);
 }
 
@@ -545,7 +618,7 @@ function parseHex(hex) {
 }
 
 // Sends entry `entry`'s cluster of dots from a point on screen (CSS px) into the orb, once,
-// in `color` (#rrggbb; defaults to the orb's own colour) which blends into the orb's blue.
+// in `color` (#rrggbb; defaults to the orb's own ink) which blends into the orb's ink.
 export function dropFrom(entry, clientX, clientY, color) {
   if (!gl || entry < 0 || entry >= STORY_ENTRIES || storyData[entry * 4 + 3]) return;
   const now = performance.now() / 1000;
@@ -553,6 +626,59 @@ export function dropFrom(entry, clientX, clientY, color) {
   const start = reducedMotion.matches ? now - CONFIG.storyFallSeconds - 10 : now;
   storyData.set([clientX * dpr, clientY * dpr, start, 1], entry * 4);
   storyColors.set(parseHex(color) || CONFIG.color, entry * 3);
+
+  // Each of its dots ripples the surface where it slots in (the shader's timing, in 32-bit floats).
+  const t0 = storyData[entry * 4 + 2];
+  for (let sub = 0; sub < STORY_DOTS; sub++) {
+    const idx = entry * STORY_DOTS + sub;
+    const time = t0 + sub * 0.18 + exact(idx, 0.618034) * 0.12 + Math.max(0.1, CONFIG.storyFallSeconds);
+    scheduled.push({ dir: storySlots.subarray(idx * 4, idx * 4 + 3), time });
+  }
+}
+
+// ---------- ripples: each square that slots in nudges the squares around it ----------
+
+// The most recent slot-ins as [x, y, z, time] (time in seconds, the frame clock). New ones overwrite
+// the oldest; the shader ignores any older than rippleSeconds.
+const ripples = new Float32Array(RIPPLES * 4).fill(-1e9);
+let nextRipple = 0;
+const scheduled = [];   // story dots' landings, known when they're dropped: { dir, time }
+
+function addRipple(dir, time) {
+  if (reducedMotion.matches || CONFIG.rippleStrength <= 0) return;
+  ripples.set(dir, nextRipple * 4);
+  ripples[nextRipple * 4 + 3] = time;
+  nextRipple = (nextRipple + 1) % RIPPLES;
+}
+
+// Finds the flowing dots that slotted in between flow times prev and now, mirroring their cycle in the
+// shader, and ripples from each. t is the frame's clock time, which ripples are timed in.
+function flowLandings(prev, now, t) {
+  const fallEnd = (1 - CONFIG.flowLinger) * 0.65;
+  const gatherSeconds = Math.max(0.05, CONFIG.gatherSeconds);
+  for (const f of flowSlots) {
+    if (f.index >= activeCount) continue;
+    const cycle = CONFIG.flowSeconds * (0.7 + 0.6 * f.k);
+    // An ordinary landing: the phase passes fallEnd. Not for a cycle skipped or drawn in by a press.
+    const n = Math.floor(now / cycle + f.phase - fallEnd);
+    if (n > Math.floor(prev / cycle + f.phase - fallEnd)) {
+      const start = (n - f.phase) * cycle;
+      const skipped = start >= gathering.start && start < gathering.end;
+      const gathered = start < gathering.start && gathering.start < start + fallEnd * cycle;
+      if (!skipped && !gathered) addRipple(f.dir, t - (now - (start + fallEnd * cycle)));
+    }
+    // Drawn in by a press: dots that were mid-fall land a set time (plus their own delay) after it.
+    const land = gathering.start + gatherSeconds + f.gatherDelay * CONFIG.gatherJitter;
+    if (prev < land && land <= now) {
+      const u = gathering.start / cycle + f.phase;
+      const phase = u - Math.floor(u);
+      if (phase > 0 && phase < fallEnd) addRipple(f.dir, t - (now - land));
+    }
+  }
+  for (let i = 0; i < scheduled.length; ) {
+    if (scheduled[i].time <= t) addRipple(scheduled[i].dir, scheduled.splice(i, 1)[0].time);
+    else i++;
+  }
 }
 
 // ---------- simulated voice ----------
@@ -609,7 +735,9 @@ function frame(nowMs) {
   const depth = reducedMotion.matches ? CONFIG.breathDepth * 0.5 : CONFIG.breathDepth;
   const breath = 1 + depth * (0.5 - 0.5 * Math.cos(breathPhase));
   voiceTime += dt * CONFIG.voiceSpeed;
+  const prevFlowTime = flowTime;
   flowTime += reducedMotion.matches ? dt * 0.5 : dt;
+  flowLandings(prevFlowTime, flowTime, t);
   const energy = voice.energy * CONFIG.speech;
 
   const k = 1 - Math.exp(-dt * 12);
@@ -644,7 +772,9 @@ function frame(nowMs) {
   gl.uniform1f(uniforms.uPullRadius, CONFIG.pullRadius);
   gl.uniform1f(uniforms.uPullStrength, CONFIG.pullStrength);
   gl.uniform1f(uniforms.uDotSize, CONFIG.dotSize);
-  gl.uniform1f(uniforms.uGlow, CONFIG.glow);
+  gl.uniform1f(uniforms.uSquare, CONFIG.squareSize);
+  gl.uniform1f(uniforms.uBurn, CONFIG.burn);
+  gl.uniform3fv(uniforms.uBurnColor, CONFIG.burnColor);
   gl.uniform1f(uniforms.uPullGlow, CONFIG.pullGlow);
   gl.uniform1f(uniforms.uLooseSpread, CONFIG.looseSpread);
   gl.uniform1f(uniforms.uLooseDrift, CONFIG.looseDrift);
@@ -666,6 +796,10 @@ function frame(nowMs) {
   gl.uniform1f(uniforms.uStoryFall, Math.max(0.1, CONFIG.storyFallSeconds));
   gl.uniform1f(uniforms.uStoryGlow, CONFIG.storyGlow);
   gl.uniform1f(uniforms.uStoryIntegrate, Math.max(0.05, CONFIG.storyIntegrateSeconds));
+  gl.uniform4fv(uniforms.uRipple, ripples);
+  gl.uniform1f(uniforms.uRippleStrength, CONFIG.rippleStrength);
+  gl.uniform1f(uniforms.uRippleSpeed, CONFIG.rippleSpeed);
+  gl.uniform1f(uniforms.uRippleSeconds, Math.max(0.1, CONFIG.rippleSeconds));
   gl.uniform3fv(uniforms.uColor, CONFIG.color);
   gl.drawArrays(gl.POINTS, 0, activeCount);
 

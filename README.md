@@ -1,6 +1,6 @@
 # laufrandsen.dk
 
-Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) with a WebGL orb of glowing dots.
+Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) on cream paper, with a WebGL orb of small ink squares, each with a soft burn around it.
 
 ## Run locally
 
@@ -12,8 +12,8 @@ Then open http://localhost:8080. Add `?tune` (http://localhost:8080/?tune) for a
 
 ## Files
 
-- `index.html`: all CV content. Each experience/project entry with `data-drop` sends dots into the orb in its `--dot` colour when it scrolls into view.
-- `style.css`: layout, phone breakpoints and the print/PDF version.
+- `index.html`: all CV content. Each experience/project entry with `data-drop` sends dots into the orb when it scrolls into view: in ink, or in the entry's `--dot` colour if one is set (e.g. `style="--dot: #8a3b1e"`).
+- `style.css`: colour tokens (paper, ink, burn) at the top, layout, phone breakpoints and the print/PDF version.
 - `orb.js`: the orb (WebGL). All tunable values are in `CONFIG` at the top.
 - `page.js`: section reveals, entry dots, project panes, PDF button.
 - `tune.js`: the `?tune` panel.
@@ -39,4 +39,4 @@ Research: look at how sites with large hero visuals, 3D scenes or canvas animati
 
 ## Publishing
 
-`gh-pages` is the live branch (custom domain in `CNAME`). This work lives on `orb` and gets merged into `gh-pages` when it is ready.
+`gh-pages` is the live branch (custom domain in `CNAME`). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready. The earlier dark, blue-dot version is kept on `orb`.

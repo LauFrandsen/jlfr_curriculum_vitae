@@ -15,7 +15,7 @@ const revealer = new IntersectionObserver((entries) => {
 document.querySelectorAll('.reveal').forEach((el) => revealer.observe(el));
 
 // Each experience/project entry, once mostly in view, releases its dots from its marker into the orb,
-// in the entry's own colour (its --dot custom property), which then blends into the orb's blue.
+// in the entry's own colour (its --dot custom property), which then blends into the orb's ink.
 const drops = [...document.querySelectorAll('[data-drop]')];
 const dropper = new IntersectionObserver((entries) => {
   for (const entry of entries) {
