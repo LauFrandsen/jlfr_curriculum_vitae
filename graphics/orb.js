@@ -3,7 +3,7 @@
 // in sends a faint ripple over the squares around it. Pressing the orb draws the falling squares in
 // and pauses new ones. Optional simulated "speech". Drawn by voxel.js.
 
-import { STORY_DOTS, STORY_TOTAL, exact, rebuild, reducedMotion } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, exact, rebuild, reducedMotion, storyLanded } from '../voxel.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -238,6 +238,7 @@ function randomDirection() {
 }
 
 let storySlots = new Float32Array(0), flowSlots = [];
+let placed = new Float32Array(0);   // the data build() made last
 
 // Shell dots sit on an even Fibonacci lattice (seed 0..1); loose (seed 1..2) and
 // flowing (seed 2..3) dots get random directions. Story dots (seed 3..4) get slots on the
@@ -282,7 +283,37 @@ function build() {
     const k = seed - 2;
     flowSlots.push({ index: i, dir: data.subarray(i * 4, i * 4 + 3), k, phase: exact(k, 61), gatherDelay: exact(k, 29) });
   }
+  placed = data;
   return data;
+}
+
+// Where the visible squares are, for morphing (see POSE in voxel.js): each at rest in its place,
+// as the shader draws it (without the loose dots' wandering and the flowing dots' travels).
+function pose() {
+  const out = [];
+  const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt);
+  for (let i = 0; i < placed.length / 4; i++) {
+    const seed = placed[i * 4 + 3];
+    let reach = 1 + (seed - 0.5) * 0.04, looseDim = 1;
+    if (seed >= 3) {
+      if (!storyLanded(Math.floor(i / STORY_DOTS))) continue;
+      reach = 1;
+    } else if (seed >= 2) {
+      looseDim = 0.8;
+      reach = 1;
+    } else if (seed >= 1) {
+      const outer = (seed - 1) ** 2;
+      reach = 1.01 + outer * CONFIG.looseSpread;
+      looseDim = 0.8 + (0.2 - 0.8) * outer;
+    }
+    const k = reach * breath;
+    const x = placed[i * 4] * k, y = placed[i * 4 + 1] * k, z = placed[i * 4 + 2] * k;
+    const py = y * ct - z * st, pz = y * st + z * ct;
+    const zn = pz / Math.hypot(x, py, pz);
+    const rim = 1 - Math.abs(zn);
+    out.push(x, py, pz, (zn + 1) / 2, looseDim, 0.6 + 0.4 * looseDim, 0.1 * rim * rim);
+  }
+  return new Float32Array(out);
 }
 
 // ---------- pressing the ball: draw in the falling dots, pause spawning ----------
@@ -395,6 +426,7 @@ function updateVoice(t, dt) {
 // ---------- frame ----------
 
 let breathPhase = 0;          // accumulated so changing breathSeconds never jumps
+let breath = 1;               // the orb's scale this frame
 let voiceTime = 0;            // accumulated separately so changing voiceSpeed never jumps
 
 function frame({ t, dt, set, activeCount }) {
@@ -403,7 +435,7 @@ function frame({ t, dt, set, activeCount }) {
   // Breathing: smooth in-and-out scale, gentler with reduced motion.
   breathPhase += (dt * Math.PI * 2) / CONFIG.breathSeconds;
   const depth = reducedMotion.matches ? CONFIG.breathDepth * 0.5 : CONFIG.breathDepth;
-  const breath = 1 + depth * (0.5 - 0.5 * Math.cos(breathPhase));
+  breath = 1 + depth * (0.5 - 0.5 * Math.cos(breathPhase));
   voiceTime += dt * CONFIG.voiceSpeed;
   const prevFlowTime = flowTime;
   flowTime += reducedMotion.matches ? dt * 0.5 : dt;
@@ -443,6 +475,7 @@ export default {
   shader: SHADER,
   build,
   frame,
+  pose,
   onDrop,
   press: gather,
   focus: (on) => { if (on) gather(); },

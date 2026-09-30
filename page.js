@@ -3,12 +3,17 @@
 
 import { dropFrom, reducedMotion, setFocus, start } from './voxel.js';
 
-// A graphic of ink squares, picked at random on each visit; ?graphic=orb (or flower) picks one.
+// A graphic of ink squares, picked at random on each visit (?graphic=orb or flower picks one), which
+// morphs into the next one in the list every few minutes of the page being on screen.
 const GRAPHICS = ['orb', 'flower'];
+const ROTATE_SECONDS = 180;
 const asked = new URLSearchParams(location.search).get('graphic');
-const name = GRAPHICS.includes(asked) ? asked : GRAPHICS[Math.floor(Math.random() * GRAPHICS.length)];
-document.documentElement.dataset.graphic = name;   // lets the CSS place each graphic its own way
-start((await import(`./graphics/${name}.js`)).default);
+let index = GRAPHICS.includes(asked) ? GRAPHICS.indexOf(asked) : Math.floor(Math.random() * GRAPHICS.length);
+const load = async (i) => (await import(`./graphics/${GRAPHICS[i]}.js`)).default;
+start(await load(index), {
+  every: ROTATE_SECONDS,
+  next: () => load(index = (index + 1) % GRAPHICS.length),
+});
 
 // Sections fade up as they come into view.
 const revealer = new IntersectionObserver((entries) => {

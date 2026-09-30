@@ -3,10 +3,10 @@
 // edge and turning in at the ground, enters the soil at its end, travels through it to the stem's foot
 // and climbs the stem to its place. Once per visit the soil forms, the roots spread, the stem pokes
 // through the ground, leaves unfold, the head fills in as a sunflower spiral and petals grow. The
-// flower then stays. Its petals live on their own: now and then one breaks apart and falls away on
+// flower then stays, mostly whole: now and then a petal (at most two) breaks apart and falls away on
 // the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
 
-import { STORY_TOTAL, rebuild, reducedMotion } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, rebuild, reducedMotion, storyLanded } from '../voxel.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -16,8 +16,9 @@ export const CONFIG = {
   landing: 0.35,              // share of the flight spent braking into place (0 = arrive at full speed)
   petalGrowSeconds: 13,       // how long the first petals take to build, all together
   petalRegrowSeconds: 7,      // how long a single new petal takes to build
-  bloomSecondsMin: 25,        // each petal lasts a random time between these, then breaks apart
-  bloomSecondsMax: 70,        //   (the first petals start breaking sooner, from 6 s)
+  breakPauseMin: 15,          // once the flower is whole, a petal breaks apart after a random pause between these
+  breakPauseMax: 40,
+  secondBreakChance: 0.2,     // chance that a second petal breaks just after the first (never more than two)
   regrowSecondsMin: 5,        // a new petal starts building a random time between these after one breaks
   regrowSecondsMax: 10,
   petalFallSeconds: 3.5,      // how long a falling petal takes to fade away
@@ -406,49 +407,77 @@ function build() {
   return data;
 }
 
-// ---------- petals, each on its own schedule ----------
+// ---------- petals: mostly whole, one (at most two) breaking now and then ----------
 
 let time = 0;       // seconds since the flower began (paused with the page)
 let gust = 0;       // a press sends a gust of wind through the flower
 
-// Per petal, in flower time: when its squares start landing, how long it takes to build, when it
-// breaks apart, and when its replacement sets off. The first petals grow together at the end of the
-// growth and start breaking soon after; after that each lives on its own.
+// Per petal, in flower time: when its squares start landing and how long it takes to build, when it
+// breaks apart (NEVER until it's picked) and when its replacement sets off.
+const NEVER = 1e9;
 const petals = [];
 const petalData = new Float32Array(MAX_PETALS * 4);
+let nextBreak = NEVER;     // when the next petal breaks: set once the flower is whole
+let secondBreak = NEVER;   // now and then a second petal follows the first
 
-function fallenBy(p) {
-  // Its squares have all let go and faded away.
-  return p.fall + 0.15 + CONFIG.petalFallSeconds + 0.2;
+const whole = (p) => time >= p.start + p.build && time < p.fall;
+
+function grow(p, start, build) {
+  Object.assign(p, { start, build, fall: NEVER, next: NEVER, seed: Math.random() });
 }
 
-function grow(p, start, build, bloom) {
-  p.start = start;
-  p.build = build;
-  p.fall = start + build + bloom;
-  p.seed = Math.random();
-  p.next = Math.max(fallenBy(p), p.fall + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
-}
-
+// The first petals grow together at the end of the growth.
 function firstPetals() {
   petals.length = 0;
   const start = PHASE.petals * CONFIG.growSeconds;
   for (let k = 0; k < shape.petals; k++) {
     const p = {};
-    grow(p, start + Math.random() * 0.2 * CONFIG.petalGrowSeconds, CONFIG.petalGrowSeconds, rand(6, CONFIG.bloomSecondsMax));
+    grow(p, start + Math.random() * 0.2 * CONFIG.petalGrowSeconds, CONFIG.petalGrowSeconds);
     petals.push(p);
   }
+  nextBreak = secondBreak = NEVER;
 }
 firstPetals();
+
+// Breaks a whole petal, unless two are already missing. Its replacement sets off 5-10 s later, once
+// the broken one's squares have faded away.
+function breakPetal() {
+  const intact = petals.filter(whole);
+  if (!intact.length || petals.length - intact.length >= 2) return;
+  const p = intact[Math.floor(Math.random() * intact.length)];
+  p.fall = time;
+  const gone = time + 0.15 + CONFIG.petalFallSeconds + 0.2;
+  p.next = Math.max(gone, time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
+}
+
+// Puts the flower in full bloom with every petal whole, as it is when it's morphed into.
+function settle() {
+  time = Math.max(time, ...petals.map((p) => p.start + p.build)) + 0.5;
+  for (const p of petals) if (!whole(p)) grow(p, time - p.build - 0.5, p.build);
+  nextBreak = secondBreak = NEVER;
+}
+
+// ---------- frame ----------
 
 function frame({ dt, set }) {
   const still = reducedMotion.matches;   // with reduced motion: the flower in full bloom, still
   if (!still) time += dt;
   for (const p of petals) {
     // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb the stem.
-    if (time >= p.next) grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds, rand(CONFIG.bloomSecondsMin, CONFIG.bloomSecondsMax));
+    if (time >= p.next) grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
   }
-  petals.forEach((p, k) => petalData.set([p.start, still ? 1e9 : p.fall, p.seed, p.build], k * 4));
+  // Once the flower is whole, a petal breaks after a pause, and now and then a second follows it.
+  if (nextBreak === NEVER && petals.every(whole)) nextBreak = time + rand(CONFIG.breakPauseMin, CONFIG.breakPauseMax);
+  if (time >= nextBreak) {
+    breakPetal();
+    nextBreak = NEVER;
+    if (Math.random() < CONFIG.secondBreakChance) secondBreak = time + rand(0.6, 1.8);
+  }
+  if (time >= secondBreak) {
+    breakPetal();
+    secondBreak = NEVER;
+  }
+  petals.forEach((p, k) => petalData.set([p.start, still ? NEVER : p.fall, p.seed, p.build], k * 4));
   gust *= Math.exp(-dt * 1.2);
 
   const firstBloom = PHASE.petals * CONFIG.growSeconds + 1.2 * CONFIG.petalGrowSeconds + CONFIG.flightSeconds;
@@ -465,6 +494,31 @@ function frame({ dt, set }) {
   set('uGust', gust);
 }
 
+// ---------- pose, for morphing ----------
+
+const PART_INK = [0, 0.95, 1.2, 1.05, 1.15, 1, 1];   // by part, as in the shader (soil has its own)
+
+// Where the visible squares are at engine time t (see POSE in voxel.js): in place, as the shader
+// views them, with the wind as it will be then.
+function pose(t) {
+  const out = [];
+  const c = Math.cos(CONFIG.pitch), s = Math.sin(CONFIG.pitch);
+  const tt = t * CONFIG.swaySpeed;
+  const sway = CONFIG.sway * (1 + 3 * gust);
+  const dx = (Math.sin(tt) + 0.4 * Math.sin(tt * 2.3 + 1.3)) * sway, dz = 0.6 * Math.sin(tt * 0.7 + 2) * sway;
+  for (const [x0, y0, z0, land, letGo, part, info] of squares) {
+    const visible = part === STORY ? storyLanded(Math.floor(info / STORY_DOTS))
+      : part === PETAL ? time >= petals[info].start + land * petals[info].build && time < petals[info].fall + letGo
+      : time >= land * CONFIG.growSeconds;
+    if (!visible) continue;
+    const h = Math.max(y0 - GROUND, 0) / shape.height;
+    const x = x0 + dx * h * h, z = z0 + dz * h * h, y = y0 - GROUND;
+    const vz = y * s + z * c;
+    out.push(x, GROUND + y * c - z * s, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info : PART_INK[part], 1, 0);
+  }
+  return new Float32Array(out);
+}
+
 // ---------- the graphic ----------
 
 export default {
@@ -474,6 +528,8 @@ export default {
   shader: SHADER,
   build,
   frame,
+  pose,
+  settle,
   press: () => { gust = 1; },
   halo: () => 0.35,
   pressDelay: 0.6,
@@ -485,8 +541,9 @@ export default {
     { group: 'Petals' },
     { key: 'petalGrowSeconds', label: 'First petals build (s)', min: 2, max: 40, step: 1 },
     { key: 'petalRegrowSeconds', label: 'A new petal builds (s)', min: 1, max: 30, step: 0.5 },
-    { key: 'bloomSecondsMin', label: 'A petal lasts at least (s)', min: 2, max: 120, step: 1 },
-    { key: 'bloomSecondsMax', label: 'A petal lasts at most (s)', min: 2, max: 180, step: 1 },
+    { key: 'breakPauseMin', label: 'Whole for at least (s)', min: 1, max: 120, step: 1 },
+    { key: 'breakPauseMax', label: 'Whole for at most (s)', min: 1, max: 180, step: 1 },
+    { key: 'secondBreakChance', label: 'Chance a second petal breaks', min: 0, max: 1, step: 0.05 },
     { key: 'regrowSecondsMin', label: 'Regrows after at least (s)', min: 1, max: 30, step: 0.5 },
     { key: 'regrowSecondsMax', label: 'Regrows after at most (s)', min: 1, max: 30, step: 0.5 },
     { key: 'petalFallSeconds', label: 'Petal falling (s)', min: 0.5, max: 8, step: 0.1 },
@@ -499,17 +556,7 @@ export default {
   ],
   actions: {
     'Grow again': () => { time = 0; firstPetals(); },
-    // Breaks one petal that's in full bloom right now.
-    'Break a petal': () => {
-      const blooming = petals.filter((p) => time > p.start + p.build && time < p.fall);
-      const p = blooming[Math.floor(Math.random() * blooming.length)];
-      if (!p) return;
-      p.fall = time;
-      p.next = Math.max(fallenBy(p), time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
-    },
-    'Full bloom': () => {
-      time = Math.max(time, Math.max(...petals.map((p) => p.start + p.build)) + 0.5);
-      for (const p of petals) if (p.fall < time + 3) grow(p, time - p.build - 0.5, p.build, rand(6, CONFIG.bloomSecondsMax));
-    },
+    'Break a petal': breakPetal,
+    'Full bloom': settle,
   },
 };

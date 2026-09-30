@@ -1,11 +1,9 @@
 // Live tuning panel for the graphic on the page. Only loaded when the URL contains ?tune.
-// Shared sliders (the squares' look, arrivals, CV entries, pointer) come first, then the graphic's own
+// Shared sliders (the squares' look, arrivals, CV entries, pointer) come after the graphic's own
 // sliders and buttons. "Copy values" copies its whole CONFIG, to paste into its file in graphics/.
+// The panel rebuilds itself for the new graphic after a morph.
 
-import { current, getStats } from './voxel.js';
-
-const graphic = current();
-const CONFIG = graphic.CONFIG;
+import { current, getStats, next } from './voxel.js';
 
 const SHARED = [
   { group: 'Squares', colors: true },
@@ -27,9 +25,6 @@ const SHARED = [
   { key: 'pullStrength', label: 'Pull strength', min: 0, max: 1, step: 0.01 },
   { key: 'pullGlow', label: 'Pull burn', min: 0, max: 1, step: 0.01 },
 ];
-const SLIDERS = [...(graphic.sliders || []), ...SHARED];
-
-const DEFAULTS = structuredClone(CONFIG);
 
 const style = document.createElement('style');
 style.textContent = `
@@ -63,97 +58,109 @@ style.textContent = `
 `;
 document.head.append(style);
 
-const panel = document.createElement('aside');
-panel.className = 'tune-panel';
-panel.innerHTML = `<header><span>Tune ${graphic.name}</span><span class="tune-caret">▾</span></header><div class="tune-body"></div>`;
-const body = panel.querySelector('.tune-body');
-panel.querySelector('header').addEventListener('click', () => {
-  panel.classList.toggle('collapsed');
-  panel.querySelector('.tune-caret').textContent = panel.classList.contains('collapsed') ? '▸' : '▾';
-});
+const defaults = new Map();   // graphic → its CONFIG as it was first opened here, for Reset
+let panel = null;
+let stats = null;
+let collapsed = false;
 
 const format = (s, v) => (s.step >= 1 ? String(Math.round(v)) : v.toFixed(Math.max(0, -Math.floor(Math.log10(s.step)))));
-const controls = [];
 
-for (const s of SLIDERS) {
-  if (s.group) {
-    const h = document.createElement('h4');
-    h.textContent = s.group;
-    body.append(h);
-    if (s.colors) body.append(colorControl('color', 'Square ink'), colorControl('burnColor', 'Burn ink'));
-    continue;
-  }
-  if (!(s.key in CONFIG)) continue;
-  const label = document.createElement('label');
-  label.innerHTML = `<span>${s.label}</span><output></output><input type="range" min="${s.min}" max="${s.max}" step="${s.step}">`;
-  const input = label.querySelector('input');
-  const out = label.querySelector('output');
-  const sync = () => { input.value = CONFIG[s.key]; out.textContent = format(s, CONFIG[s.key]); };
-  input.addEventListener('input', () => {
-    CONFIG[s.key] = Number(input.value);
-    out.textContent = format(s, CONFIG[s.key]);
-    s.apply?.(CONFIG[s.key]);
+function open(graphic) {
+  const CONFIG = graphic.CONFIG;
+  if (!defaults.has(graphic)) defaults.set(graphic, structuredClone(CONFIG));
+  const sliders = [...(graphic.sliders || []), ...SHARED];
+  const controls = [];
+
+  panel?.remove();
+  panel = document.createElement('aside');
+  panel.className = 'tune-panel' + (collapsed ? ' collapsed' : '');
+  panel.innerHTML = `<header><span>Tune ${graphic.name}</span><span class="tune-caret">${collapsed ? '▸' : '▾'}</span></header><div class="tune-body"></div>`;
+  const body = panel.querySelector('.tune-body');
+  panel.querySelector('header').addEventListener('click', () => {
+    collapsed = panel.classList.toggle('collapsed');
+    panel.querySelector('.tune-caret').textContent = collapsed ? '▸' : '▾';
   });
-  sync();
-  controls.push(sync);
-  body.append(label);
-}
 
-function colorControl(key, text) {
-  const label = document.createElement('label');
-  label.innerHTML = `<span>${text}</span><input type="color">`;
-  const input = label.querySelector('input');
-  const toHex = (c) => '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
-  const sync = () => { input.value = toHex(CONFIG[key]); };
-  input.addEventListener('input', () => {
-    const h = input.value;
-    CONFIG[key] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-  });
-  sync();
-  controls.push(sync);
-  return label;
-}
+  const colorControl = (key, text) => {
+    const label = document.createElement('label');
+    label.innerHTML = `<span>${text}</span><input type="color">`;
+    const input = label.querySelector('input');
+    const toHex = (c) => '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+    const sync = () => { input.value = toHex(CONFIG[key]); };
+    input.addEventListener('input', () => {
+      const h = input.value;
+      CONFIG[key] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+    });
+    sync();
+    controls.push(sync);
+    return label;
+  };
 
-const buttons = document.createElement('div');
-buttons.className = 'tune-buttons';
-for (const [text, act] of Object.entries(graphic.actions || {})) {
-  const b = document.createElement('button');
-  b.textContent = text;
-  b.addEventListener('click', act);
-  buttons.append(b);
-}
-const copy = document.createElement('button');
-copy.textContent = 'Copy values';
-copy.addEventListener('click', async () => {
-  const round = (c) => c.map((v) => +v.toFixed(3));
-  const text = JSON.stringify({ ...CONFIG, color: round(CONFIG.color), burnColor: round(CONFIG.burnColor) }, null, 2);
-  try {
-    await navigator.clipboard.writeText(text);
-    copy.textContent = 'Copied!';
-  } catch {
-    prompt('Copy these values:', text);
+  for (const s of sliders) {
+    if (s.group) {
+      const h = document.createElement('h4');
+      h.textContent = s.group;
+      body.append(h);
+      if (s.colors) body.append(colorControl('color', 'Square ink'), colorControl('burnColor', 'Burn ink'));
+      continue;
+    }
+    if (!(s.key in CONFIG)) continue;
+    const label = document.createElement('label');
+    label.innerHTML = `<span>${s.label}</span><output></output><input type="range" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    const input = label.querySelector('input');
+    const out = label.querySelector('output');
+    const sync = () => { input.value = CONFIG[s.key]; out.textContent = format(s, CONFIG[s.key]); };
+    input.addEventListener('input', () => {
+      CONFIG[s.key] = Number(input.value);
+      out.textContent = format(s, CONFIG[s.key]);
+      s.apply?.(CONFIG[s.key]);
+    });
+    sync();
+    controls.push(sync);
+    body.append(label);
   }
-  setTimeout(() => { copy.textContent = 'Copy values'; }, 1500);
-});
-const reset = document.createElement('button');
-reset.textContent = 'Reset';
-reset.addEventListener('click', () => {
-  const rebuilds = SLIDERS.filter((s) => s.apply && CONFIG[s.key] !== DEFAULTS[s.key]);
-  Object.assign(CONFIG, structuredClone(DEFAULTS));
-  rebuilds.forEach((s) => s.apply(CONFIG[s.key]));
-  controls.forEach((sync) => sync());
-});
-buttons.append(copy, reset);
-body.append(buttons);
 
-// Live frame rate and square count, so you can see the cost of each change.
-const stats = document.createElement('div');
-stats.className = 'tune-stats';
-body.append(stats);
+  const buttons = document.createElement('div');
+  buttons.className = 'tune-buttons';
+  const button = (text, act) => {
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.addEventListener('click', () => act(b));
+    buttons.append(b);
+  };
+  for (const [text, act] of Object.entries(graphic.actions || {})) button(text, act);
+  button('Next graphic', () => next());
+  button('Copy values', async (b) => {
+    const round = (c) => c.map((v) => +v.toFixed(3));
+    const text = JSON.stringify({ ...CONFIG, color: round(CONFIG.color), burnColor: round(CONFIG.burnColor) }, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      b.textContent = 'Copied!';
+    } catch {
+      prompt('Copy these values:', text);
+    }
+    setTimeout(() => { b.textContent = 'Copy values'; }, 1500);
+  });
+  button('Reset', () => {
+    const initial = defaults.get(graphic);
+    const rebuilds = sliders.filter((s) => s.apply && CONFIG[s.key] !== initial[s.key]);
+    Object.assign(CONFIG, structuredClone(initial));
+    rebuilds.forEach((s) => s.apply(CONFIG[s.key]));
+    controls.forEach((sync) => sync());
+  });
+  body.append(buttons);
+
+  // Live frame rate and square count, so you can see the cost of each change.
+  stats = document.createElement('div');
+  stats.className = 'tune-stats';
+  body.append(stats);
+  document.body.append(panel);
+}
+
 let frames = 0, since = performance.now();
 (function tick(now) {
   frames++;
-  if (now - since > 500) {
+  if (now - since > 500 && stats) {
     const { drawn, requested } = getStats();
     const fps = Math.round((frames * 1000) / (now - since));
     stats.textContent = `${fps} fps · ${drawn}${drawn < requested ? ` of ${requested}` : ''} squares`;
@@ -163,4 +170,5 @@ let frames = 0, since = performance.now();
   requestAnimationFrame(tick);
 })(performance.now());
 
-document.body.append(panel);
+open(current());
+document.addEventListener('voxel:graphic', () => open(current()));

@@ -1,6 +1,6 @@
 # laufrandsen.dk
 
-Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) on cream paper, with a WebGL graphic made of small ink squares, each with a soft burn around it. Each visit picks one of the graphics at random: the orb or the flower.
+Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) on cream paper, with a WebGL graphic made of small ink squares, each with a soft burn around it. Each visit starts on one of the graphics at random, the orb or the flower, and every 3 minutes the squares rearrange themselves into the next one.
 
 ## Run locally
 
@@ -8,21 +8,23 @@ Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no bui
 node .claude/serve.mjs 8080
 ```
 
-Then open http://localhost:8080. Add `?graphic=orb` or `?graphic=flower` to pick a graphic, and `?tune` for a live slider panel (e.g. http://localhost:8080/?graphic=flower&tune). The panel's "Copy values" button copies the settings so they can be pasted into `CONFIG` in that graphic's file in `graphics/`.
+Then open http://localhost:8080. Add `?graphic=orb` or `?graphic=flower` to start on a graphic, and `?tune` for a live slider panel (e.g. http://localhost:8080/?graphic=flower&tune). The panel's "Next graphic" button morphs into the next graphic without waiting, and "Copy values" copies the settings so they can be pasted into `CONFIG` in that graphic's file in `graphics/`.
 
 ## Files
 
 - `index.html`: all CV content. Each experience/project entry with `data-drop` sends squares into the graphic when it scrolls into view: in ink, or in the entry's `--dot` colour if one is set (e.g. `style="--dot: #8a3b1e"`).
 - `style.css`: colour tokens (paper, ink, burn) at the top, layout, phone breakpoints and the print/PDF version. `.voxel-rest` sets where the graphic rests once scrolled: beside the text from 1100px, and below that on the bottom edge as a "horizon", with the text fading into the paper (`.paper-fade`) just above it. `html[data-graphic="…"]` rules place a graphic its own way.
-- `voxel.js`: the engine every graphic shares (WebGL). It draws the squares and their burn, glides the graphic with the page (hero, rest, horizon, beside a project pane), drops the CV entries' squares in, and handles the pointer, presses and adaptive quality.
+- `voxel.js`: the engine every graphic shares (WebGL). It draws the squares and their burn, glides the graphic with the page (hero, rest, horizon, beside a project pane), drops the CV entries' squares in, handles the pointer, presses and adaptive quality, and morphs from one graphic into the next.
 - `graphics/orb.js`: the orb. A breathing shell of squares with more flowing in from the screen edges, rippling the surface where they land.
-- `graphics/flower.js`: the flower. It grows out of a strip of soil over about a minute, every square flying up from below through the soil and the stem. At full bloom the petals fall away, the rest returns into the ground, and a new flower grows.
-- `page.js`: picks the graphic; section reveals, entry squares, project panes, PDF button.
-- `tune.js`: the `?tune` panel, with shared sliders plus each graphic's own sliders and buttons.
+- `graphics/flower.js`: the flower. It grows once out of a strip of soil, every square coming in from the side of the screen, through the soil and up the stem. It then stays mostly whole: now and then a petal (at most two) breaks away and a new one grows back.
+- `page.js`: picks the first graphic and the rotation (`GRAPHICS`, `ROTATE_SECONDS`); section reveals, entry squares, project panes, PDF button.
+- `tune.js`: the `?tune` panel, with each graphic's own sliders and buttons plus shared ones.
 
 ## Adding a graphic
 
-Add `graphics/<name>.js`, whose default export describes the graphic (see the comment at the top of `voxel.js`): its `CONFIG`, its squares (`build()`), its vertex shader (which ends by calling the shared `emit()`), and a `frame()` that sets its uniforms. Then add its name to `GRAPHICS` in `page.js`. Keep the story squares (CV entries) at the front of its data, and shuffle the rest, so drawing only part of it on a slow device still looks whole.
+Add `graphics/<name>.js`, whose default export describes the graphic (see the comment at the top of `voxel.js`): its `CONFIG`, its squares (`build()`), its vertex shader (which ends by calling the shared `emit()`), a `frame()` that sets its uniforms, and a `pose()` that says where its visible squares are, which is what the morph flies squares from and to. If it builds up over time, give it a `settle()` that puts it in its finished state, so it appears whole when it's morphed into. Then add its name to `GRAPHICS` in `page.js`, and it joins the rotation. Keep the story squares (CV entries) at the front of its data, and shuffle the rest, so drawing only part of it on a slow device still looks whole.
+
+The morph pairs squares by position (bottom to top, then left to right), so each part of one graphic flows into the part of the next that sits in the same place. Squares one graphic has more of come in from, or leave to, the side of the screen.
 
 ## Future work: make the graphics feel interactive on phones
 
