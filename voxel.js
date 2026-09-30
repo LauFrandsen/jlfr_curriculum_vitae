@@ -165,8 +165,16 @@ vec2 project(vec3 p, out float s) {
 bool story(float idx, out float fall, out vec2 start, out float heat, out float fade) {
   float entry = floor(idx / ${STORY_DOTS.toFixed(1)});
   float sub = idx - entry * ${STORY_DOTS.toFixed(1)};
-  vec4 s = uStory[int(entry)];
-  vColor = uStoryColor[int(entry)];
+  // Its entry's data, picked with a constant-index loop: some phone GPUs get uniform arrays indexed
+  // with a per-square value wrong.
+  vec4 s = vec4(0.0);
+  vColor = uColor;
+  for (int i = 0; i < ${STORY_ENTRIES}; i++) {
+    if (float(i) == entry) {
+      s = uStory[i];
+      vColor = uStoryColor[i];
+    }
+  }
   float t = uTime - s.z - sub * 0.18 - exact(idx, 0.618034) * 0.12;
   start = s.xy + (vec2(hash(idx * 1.3), hash(idx * 2.9)) - 0.5) * uRadius * 0.08;
   fall = 1.0;
@@ -375,11 +383,17 @@ function layerFor(graphic) {
   return layer;
 }
 
-// (Re)builds the squares of the graphic being shown.
-export function rebuild() {
-  if (!shown) return;
-  upload(shown, shown.graphic.build());
-  resetQuality();
+// The layer whose graphic's frame() is running, if any.
+let framing = null;
+
+// (Re)builds a graphic's squares: from within its frame(), that graphic's; otherwise the one being
+// shown. keepQuality keeps the adaptive quality's findings, for graphics that rebuild as they animate.
+export function rebuild({ keepQuality = false } = {}) {
+  const layer = framing ?? shown;
+  if (!layer) return;
+  upload(layer, layer.graphic.build());
+  if (framing) use(layer);
+  if (!keepQuality) resetQuality();
 }
 
 // ---------- layout ----------
@@ -691,10 +705,11 @@ function setShared(config, fade, other = config, k = 0) {
 function drawGraphic(layer, fade, t, dt) {
   use(layer);
   using = layer;
-  const active = activeOf(layer);
-  layer.graphic.frame({ t, dt, set, activeCount: active });
+  framing = layer;
+  layer.graphic.frame({ t, dt, set, activeCount: activeOf(layer) });
+  framing = null;
   setShared(layer.graphic.CONFIG, fade);
-  gl.drawArrays(gl.POINTS, 0, active);
+  gl.drawArrays(gl.POINTS, 0, activeOf(layer));
 }
 
 function frame(nowMs) {
@@ -840,6 +855,13 @@ function adaptQuality(rawDt) {
 
 // ---------- start ----------
 
+function glState() {
+  gl.disable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // ink over paper: overlapping squares darken
+  gl.clearColor(0, 0, 0, 0);
+}
+
 // Starts drawing graphic g (a graphics/*.js default export). With rotate = { every, next }, morphs
 // into the graphic next() resolves to after every `every` seconds of the page on screen.
 export function start(g, rotate) {
@@ -850,10 +872,7 @@ export function start(g, rotate) {
   }
   shown = layerFor(g);
   if (rotate) rotation = { ...rotate, since: 0, upcoming: null };
-  gl.disable(gl.DEPTH_TEST);
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // ink over paper: overlapping squares darken
-  gl.clearColor(0, 0, 0, 0);
+  glState();
   listen();
   const resize = new ResizeObserver(layout);
   resize.observe(slot);
@@ -864,12 +883,15 @@ export function start(g, rotate) {
   layout();
   canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
   canvas.addEventListener('webglcontextrestored', () => {
-    // Everything on the GPU is gone: rebuild the layer being shown; the rest are rebuilt when needed.
+    // Everything on the GPU is gone, state included: rebuild the layer being shown (the rest are
+    // rebuilt when needed) and switch blending back on.
     const graphic = shown.graphic;
     layers.clear();
     morph = null;
     morphLayer = null;
+    enabledAttribs = 0;
     shown = layerFor(graphic);
+    glState();
     layout();
   });
   requestAnimationFrame(frame);
