@@ -528,10 +528,16 @@ function measure(el, into, brightnessVar) {
   into.brightness = parseFloat(getComputedStyle(el).getPropertyValue(brightnessVar)) || into.brightness;
 }
 
+// The canvas's own CSS size at the last layout. frame() re-runs layout() as soon as it changes: a
+// phone's address bar can resize this fixed layer mid-scroll without a timely resize event.
+const laidOut = { w: 0, h: 0 };
+
 function layout() {
   dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
-  canvas.width = Math.round(innerWidth * dpr);
-  canvas.height = Math.round(innerHeight * dpr);
+  laidOut.w = canvas.clientWidth || innerWidth;
+  laidOut.h = canvas.clientHeight || innerHeight;
+  canvas.width = Math.round(laidOut.w * dpr);
+  canvas.height = Math.round(laidOut.h * dpr);
   const box = slot.getBoundingClientRect();
   hero.x = (box.left + box.width / 2) * dpr;
   hero.y = (box.top + scrollY + box.height / 2) * dpr;
@@ -755,6 +761,7 @@ function frame(nowMs) {
   const dt = Math.min(0.05, rawDt);
   last = t;
 
+  if (canvas.clientWidth && (canvas.clientWidth !== laidOut.w || canvas.clientHeight !== laidOut.h)) layout();
   adaptQuality(rawDt);
   updateVoice(t, dt);
 
