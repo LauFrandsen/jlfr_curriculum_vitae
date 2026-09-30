@@ -22,9 +22,9 @@ old `laufrandsen.dk` identity.
 | File | What changes |
 |---|---|
 | `CNAME` | the GitHub Pages custom domain — lowercase, one line, no scheme |
-| `_config.yml` | the `url:` field |
-| `index.md` | `mailto:` link, visible email text, print-only "see webpage" link |
-| `projects.md` | `mailto:` link and visible email text |
+| `index.html` | `og:url` meta tag; both `mailto:` links and their visible email text (intro and footer); the print-only "Interactive version: laufrandsen.dk" line |
+| `projects.html` | the `canonical` link (the redirect itself is relative) |
+| `README.md` | the title |
 
 ## Notes
 

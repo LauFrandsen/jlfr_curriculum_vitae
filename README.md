@@ -1,65 +1,48 @@
-# markdown-cv
+# laufrandsen.dk
 
-A curriculum vitae maintained in plain text and rendered to HTML and PDF using CSS.
+Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) on cream paper, with a WebGL orb of small ink squares, each with a soft burn around it.
 
-For more details, see the [project page](http://elipapa.github.io/markdown-cv), or the blog post on [why I switched to markdown for my CV](http://elipapa.github.io/blog/why-i-switched-to-markdown-for-my-cv.html).
+## Run locally
 
-***
+```bash
+node .claude/serve.mjs 8080
+```
 
-## Customization
+Then open http://localhost:8080. Add `?tune` (http://localhost:8080/?tune) for a live slider panel; its "Copy values" button copies the settings so they can be pasted into `CONFIG` in `orb.js`.
 
-Simply [fork the markdown-cv repo](https://github.com/elipapa/markdown-cv)
+## Files
 
-![](https://help.github.com/assets/images/help/repository/fork_button.jpg)
+- `index.html`: all CV content. Each experience/project entry with `data-drop` sends dots into the orb when it scrolls into view: in ink, or in the entry's `--dot` colour if one is set (e.g. `style="--dot: #8a3b1e"`).
+- `style.css`: colour tokens (paper, ink, burn) at the top, layout, phone breakpoints and the print/PDF version. `.orb-rest` sets where the orb rests once scrolled: beside the text from 1100px, and below that on the bottom edge as a "horizon", with the text fading into the paper (`.paper-fade`) just above it.
+- `orb.js`: the orb (WebGL). All tunable values are in `CONFIG` at the top.
+- `page.js`: section reveals, entry dots, project panes, PDF button.
+- `tune.js`: the `?tune` panel.
 
-and edit the `index.md` file [directly in Github](https://help.github.com/articles/editing-files-in-your-repository/)
+## Future work: make the orb feel interactive on phones
 
-![](https://help.github.com/assets/images/help/repository/edit-file-edit-button.png)
+On phones the orb looks right but is mostly something you watch, not something you play with. That needs research into how other sites keep large visual elements feeling interactive on touch screens.
 
-adding your skills, jobs and education.
+Why it's limited today:
 
-![](https://help.github.com/assets/images/help/repository/edit-readme-light.png)
+- There is no hover on touch screens, so the pointer pull (dots drawn toward the cursor) only happens while a finger is down.
+- A swipe that starts on the orb has to scroll the page (`touch-action: pan-y`), so dragging across the orb scrolls instead of playing with it.
+- Once scrolled, the orb rests on the bottom edge as a horizon. It sits above the text there but lets touches through (`pointer-events: none`), so the page stays usable; it can't be touched either.
 
-## Distribution
+Research: look at how sites with large hero visuals, 3D scenes or canvas animations handle this on phones, and what makes them feel responsive. Ideas to evaluate:
 
-To transform your plain text CV into a beautiful and shareable HTML page, you have two options:
+- Tap-and-hold on the orb to "grab" it (and stop the page from scrolling while held), with a visible cue that it can be held.
+- Scroll itself as the interaction: the orb reacting to scroll speed and direction.
+- Tilting the phone (device orientation) to move or light the orb. iOS asks for permission first, so it needs a clear, optional trigger.
+- Short haptic feedback on taps where supported (not available on iOS Safari).
+- A dedicated, clearly interactive area in the hero, separate from the scroll gesture.
+- Larger, more forgiving touch targets and effects sized for fingers rather than a cursor.
 
-### I. Use Github Pages to publish it online
+## Publishing
 
-1. Delete the existing `gh-pages` branch from your fork. It will only contain this webpage. You can either use git or [the Github web interface](https://help.github.com/articles/creating-and-deleting-branches-within-your-repository/#deleting-a-branch).
-2. Create a new branch called `gh-pages`.
-3. Head to *yourusername*.github.io/markdown-cv to see your CV live.
+`gh-pages` is the live branch (custom domain in `CNAME`). GitHub Pages builds it with its standard Jekyll build, which copies the site as-is (`_config.yml` only keeps the notes unpublished). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready:
 
-Any change you want to make to your CV from then on would have to be done on the `gh-pages` branch and will be immediately rendered by Github Pages.
+```bash
+git switch gh-pages && git merge light && git push && git switch light
+```
 
-### II. Build it locally and print a PDF
-
-1. To [install jekyll](https://jekyllrb.com/docs/installation/), run `gem install bundler jekyll` from the command line.
-3. [Clone](https://help.github.com/en/articles/cloning-a-repository) your fork of markdown-cv to your local machine.
-3. Type `jekyll serve` to render your CV at http://localhost:4000.
-4. You can edit the `index.md` file and see the changes live in your browser.
-5. To print a PDF, press <kbd>⌘</kbd> + <kbd>p</kbd>. Print and web CSS media queries should take care of the styling.
-
-## Styling
-
-The included CSS will render your CV in two styles:
-s
-1. `kjhealy` the original default, inspired by [kjhealy's vita
-template](https://github.com/kjhealy/kjh-vita).
-2. `davewhipp` is a tweaked version of `kjhealy`, with bigger fonts and dates
-  right aligned.
-
-To change the default style, simply change the variable in the
-`_config.yml` file.
-
-Any other styling is possible. More CSS style contributions and forks are welcome!
-
-### Author
-
-Eliseo Papa ([Twitter](http://twitter.com/elipapa)/[Github](http://github.com/elipapa)/[Website](https://elipapa.github.io)).
-
-![Eliseo Papa](https://s.gravatar.com/avatar/eae1f0c01afda2bed9ce9cb88f6873f6?s=100)
-
-### License
-
-[MIT License](https://github.com/elipapa/markdown-cv/blob/master/LICENSE)
+The earlier dark, blue-dot version is kept on `orb`, and the old Jekyll CV lives on in `gh-pages`' history. Its `projects.html` URL now redirects to `/#projects`. A planned move to `biunefrandsen.dk` is described in `DOMAIN-MIGRATION.md`.
