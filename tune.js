@@ -1,57 +1,33 @@
-// Live tuning panel for the orb. Only loaded when the URL contains ?tune.
+// Live tuning panel for the graphic on the page. Only loaded when the URL contains ?tune.
+// Shared sliders (the squares' look, arrivals, CV entries, pointer) come first, then the graphic's own
+// sliders and buttons. "Copy values" copies its whole CONFIG, to paste into its file in graphics/.
 
-import { CONFIG, setDotCount, speakNow, gather, getStats } from './orb.js';
+import { current, getStats } from './voxel.js';
 
-const SLIDERS = [
-  { group: 'Dots' },
-  { key: 'dotCount', label: 'Number of dots', min: 1000, max: 20000, step: 500, apply: setDotCount },
+const graphic = current();
+const CONFIG = graphic.CONFIG;
+
+const SHARED = [
+  { group: 'Squares', colors: true },
   { key: 'dotSize', label: 'Dot size (square + burn)', min: 0.005, max: 0.08, step: 0.001 },
   { key: 'squareSize', label: 'Square (share of dot)', min: 0.05, max: 1, step: 0.01 },
   { key: 'burn', label: 'Burn', min: 0, max: 1.5, step: 0.05 },
   { key: 'brightness', label: 'Ink strength', min: 0.2, max: 2, step: 0.05 },
-  { group: 'Flow' },
-  { key: 'flowCount', label: 'Flowing dots', min: 0, max: 1000, step: 10, apply: () => setDotCount(CONFIG.dotCount) },
-  { key: 'flowSeconds', label: 'Cycle length (s)', min: 4, max: 60, step: 1 },
-  { key: 'flowLinger', label: 'Time resting in slot', min: 0, max: 0.9, step: 0.05 },
-  { key: 'gravity', label: 'Gravity (slow start, fast finish)', min: 0, max: 12, step: 0.1 },
-  { key: 'landing', label: 'Landing (brake into slot)', min: 0, max: 0.8, step: 0.05 },
-  { key: 'flowSwirl', label: 'Spiral in', min: 0, max: 3, step: 0.05 },
+  { key: 'cameraDistance', label: 'Perspective (low = strong)', min: 1.6, max: 8, step: 0.1 },
+  { group: 'Arriving' },
+  { key: 'landing', label: 'Landing (brake into place)', min: 0, max: 0.8, step: 0.05 },
   { key: 'slotGlow', label: 'Slot-in burn', min: 0, max: 4, step: 0.05 },
   { key: 'afterglowSeconds', label: 'Afterglow (s)', min: 0, max: 8, step: 0.1 },
-  { key: 'gatherSeconds', label: 'Press: draw-in time (s)', min: 0.2, max: 5, step: 0.1 },
-  { key: 'gatherJitter', label: 'Press: arrival spread (s)', min: 0, max: 1.5, step: 0.05 },
-  { key: 'respawnDelay', label: 'Press: pause before respawn (s)', min: 0, max: 20, step: 0.5 },
-  { group: 'Ripples' },
-  { key: 'rippleStrength', label: 'Ripple strength (0 = off)', min: 0, max: 0.05, step: 0.001 },
-  { key: 'rippleSpeed', label: 'Ripple speed', min: 0.05, max: 1.5, step: 0.05 },
-  { key: 'rippleSeconds', label: 'Ripple length (s)', min: 0.2, max: 5, step: 0.1 },
   { group: 'CV entries' },
-  { key: 'storyFallSeconds', label: 'Entry dots: fall time (s)', min: 0.5, max: 8, step: 0.1 },
-  { key: 'storyGlow', label: 'Entry dots: lasting burn', min: 0, max: 1.5, step: 0.05 },
-  { key: 'storyIntegrateSeconds', label: 'Entry dots: colour to ink (s)', min: 0.5, max: 20, step: 0.5 },
-  { group: 'Speech' },
-  { key: 'speech', label: 'Speech amount (0 = off)', min: 0, max: 1, step: 0.05 },
-  { key: 'voiceAmplitude', label: 'Core swell', min: 0, max: 0.3, step: 0.005 },
-  { key: 'voiceSpeed', label: 'Wobble speed', min: 0.1, max: 4, step: 0.05 },
-  { key: 'syllableMs', label: 'Syllable length (ms)', min: 30, max: 300, step: 5 },
-  { key: 'responsiveness', label: 'Snappiness', min: 2, max: 40, step: 1 },
-  { key: 'burstSeconds', label: 'Burst length (s)', min: 0.5, max: 8, step: 0.1 },
-  { key: 'pauseSeconds', label: 'Pause between (s)', min: 0.2, max: 10, step: 0.1 },
-  { group: 'Loose particles' },
-  { key: 'looseFraction', label: 'Amount (share of shell)', min: 0, max: 0.5, step: 0.01, apply: () => setDotCount(CONFIG.dotCount) },
-  { key: 'looseSpread', label: 'Distance out', min: 0, max: 0.5, step: 0.005 },
-  { key: 'looseDrift', label: 'Wander', min: 0, max: 0.2, step: 0.005 },
-  { key: 'looseVoice', label: 'Push when speaking', min: 0, max: 0.6, step: 0.01 },
-  { group: 'Breathing' },
-  { key: 'breathSeconds', label: 'Breath length (s)', min: 1, max: 20, step: 0.5 },
-  { key: 'breathDepth', label: 'Breath depth', min: 0, max: 0.2, step: 0.005 },
-  { key: 'tilt', label: 'Viewing angle', min: 0, max: 1.2, step: 0.01 },
-  { key: 'cameraDistance', label: 'Perspective (low = strong)', min: 1.6, max: 8, step: 0.1 },
+  { key: 'storyFallSeconds', label: 'Entry squares: fall time (s)', min: 0.5, max: 8, step: 0.1 },
+  { key: 'storyGlow', label: 'Entry squares: lasting burn', min: 0, max: 1.5, step: 0.05 },
+  { key: 'storyIntegrateSeconds', label: 'Entry squares: colour to ink (s)', min: 0.5, max: 20, step: 0.5 },
   { group: 'Pointer pull' },
   { key: 'pullRadius', label: 'Pull radius', min: 0.1, max: 1.5, step: 0.05 },
   { key: 'pullStrength', label: 'Pull strength', min: 0, max: 1, step: 0.01 },
   { key: 'pullGlow', label: 'Pull burn', min: 0, max: 1, step: 0.01 },
 ];
+const SLIDERS = [...(graphic.sliders || []), ...SHARED];
 
 const DEFAULTS = structuredClone(CONFIG);
 
@@ -89,8 +65,7 @@ document.head.append(style);
 
 const panel = document.createElement('aside');
 panel.className = 'tune-panel';
-panel.dataset.noPull = '';
-panel.innerHTML = `<header><span>Tune orb</span><span class="tune-caret">▾</span></header><div class="tune-body"></div>`;
+panel.innerHTML = `<header><span>Tune ${graphic.name}</span><span class="tune-caret">▾</span></header><div class="tune-body"></div>`;
 const body = panel.querySelector('.tune-body');
 panel.querySelector('header').addEventListener('click', () => {
   panel.classList.toggle('collapsed');
@@ -105,9 +80,10 @@ for (const s of SLIDERS) {
     const h = document.createElement('h4');
     h.textContent = s.group;
     body.append(h);
-    if (s.group === 'Dots') body.append(colorControl('color', 'Square ink'), colorControl('burnColor', 'Burn ink'));
+    if (s.colors) body.append(colorControl('color', 'Square ink'), colorControl('burnColor', 'Burn ink'));
     continue;
   }
+  if (!(s.key in CONFIG)) continue;
   const label = document.createElement('label');
   label.innerHTML = `<span>${s.label}</span><output></output><input type="range" min="${s.min}" max="${s.max}" step="${s.step}">`;
   const input = label.querySelector('input');
@@ -140,32 +116,37 @@ function colorControl(key, text) {
 
 const buttons = document.createElement('div');
 buttons.className = 'tune-buttons';
-buttons.innerHTML = `<button data-act="gather">Draw in</button><button data-act="speak">Speak now</button><button data-act="copy">Copy values</button><button data-act="reset">Reset</button>`;
-buttons.addEventListener('click', async (e) => {
-  const act = e.target.dataset.act;
-  if (act === 'gather') gather();
-  if (act === 'speak') speakNow();
-  if (act === 'reset') {
-    Object.assign(CONFIG, structuredClone(DEFAULTS));
-    setDotCount(CONFIG.dotCount);
-    controls.forEach((sync) => sync());
+for (const [text, act] of Object.entries(graphic.actions || {})) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  b.addEventListener('click', act);
+  buttons.append(b);
+}
+const copy = document.createElement('button');
+copy.textContent = 'Copy values';
+copy.addEventListener('click', async () => {
+  const round = (c) => c.map((v) => +v.toFixed(3));
+  const text = JSON.stringify({ ...CONFIG, color: round(CONFIG.color), burnColor: round(CONFIG.burnColor) }, null, 2);
+  try {
+    await navigator.clipboard.writeText(text);
+    copy.textContent = 'Copied!';
+  } catch {
+    prompt('Copy these values:', text);
   }
-  if (act === 'copy') {
-    const round = (c) => c.map((v) => +v.toFixed(3));
-    const values = { ...CONFIG, color: round(CONFIG.color), burnColor: round(CONFIG.burnColor) };
-    const text = JSON.stringify(values, null, 2);
-    try {
-      await navigator.clipboard.writeText(text);
-      e.target.textContent = 'Copied!';
-    } catch {
-      prompt('Copy these values:', text);
-    }
-    setTimeout(() => { e.target.textContent = 'Copy values'; }, 1500);
-  }
+  setTimeout(() => { copy.textContent = 'Copy values'; }, 1500);
 });
+const reset = document.createElement('button');
+reset.textContent = 'Reset';
+reset.addEventListener('click', () => {
+  const rebuilds = SLIDERS.filter((s) => s.apply && CONFIG[s.key] !== DEFAULTS[s.key]);
+  Object.assign(CONFIG, structuredClone(DEFAULTS));
+  rebuilds.forEach((s) => s.apply(CONFIG[s.key]));
+  controls.forEach((sync) => sync());
+});
+buttons.append(copy, reset);
 body.append(buttons);
 
-// Live frame rate and dot count, so you can see the cost of each change.
+// Live frame rate and square count, so you can see the cost of each change.
 const stats = document.createElement('div');
 stats.className = 'tune-stats';
 body.append(stats);
@@ -175,7 +156,7 @@ let frames = 0, since = performance.now();
   if (now - since > 500) {
     const { drawn, requested } = getStats();
     const fps = Math.round((frames * 1000) / (now - since));
-    stats.textContent = `${fps} fps · ${drawn}${drawn < requested ? ` of ${requested}` : ''} dots`;
+    stats.textContent = `${fps} fps · ${drawn}${drawn < requested ? ` of ${requested}` : ''} squares`;
     frames = 0;
     since = now;
   }

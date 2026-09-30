@@ -2,7 +2,7 @@
   --bg: #f5f2ea;                      /* the paper: off-white with a trace of cream */
   --paper: radial-gradient(circle at 50% 45%, #faf8f3 0%, #f5f2ea 45%, #ece7dc 100%);
   --raised: rgba(250, 248, 243, 0.88); /* windows laid on the paper */
-  --ink: #11100f;                     /* a warm black, the same ink as the orb */
+  --ink: #11100f;                     /* a warm black, the same ink as the graphic */
   --burn: #3a2614;                    /* scorch around ink squares: near-black with a trace of umber */
   --text: #37332e;
   --text-strong: var(--ink);
@@ -55,9 +55,9 @@ a:focus-visible, button:focus-visible {
   outline-offset: 3px;
 }
 
-/* ---------- the paper and the orb (fixed layers behind the page) ---------- */
+/* ---------- the paper and the graphic (fixed layers behind the page) ---------- */
 
-/* The paper: a touch lighter where the orb sits, settling into a warmer cream at the edges. */
+/* The paper: a touch lighter in the middle, settling into a warmer cream at the edges. */
 .void {
   position: fixed;
   inset: 0;
@@ -65,8 +65,8 @@ a:focus-visible, button:focus-visible {
   background: var(--paper);
 }
 
-/* A faint scorch on the paper around the orb; orb.js centres and scales it on the orb every frame. */
-.orb-halo {
+/* A faint scorch on the paper behind the graphic; voxel.js centres and scales it on it every frame. */
+.voxel-halo {
   position: fixed;
   left: 0;
   top: 0;
@@ -79,20 +79,20 @@ a:focus-visible, button:focus-visible {
   will-change: transform, opacity;
 }
 
-#orb-canvas {
+#voxel-canvas {
   position: fixed;
   inset: 0;
   z-index: -1;
   width: 100%;
   height: 100%;
-  touch-action: pan-y;   /* the page must still scroll when a swipe starts on the orb */
+  touch-action: pan-y;   /* the page must still scroll when a swipe starts on the graphic */
 }
 
-/* Where the orb rests once scrolled. Invisible; orb.js reads its box.
+/* Where the graphic rests once scrolled. Invisible; voxel.js reads its box.
    Below 1100px there's no room beside the text, so it sinks to the bottom edge like a horizon:
    centred below the screen so only its top --horizon-band shows. Loose and flowing squares above
    --horizon-clip (a share of the screen height) fade out, and #paper-fade fades the text out above it. */
-.orb-rest {
+.voxel-rest {
   --rest-brightness: 0.8;
   --horizon-size: min(118vw, 700px);
   --horizon-band: 16svh;
@@ -109,8 +109,19 @@ a:focus-visible, button:focus-visible {
   pointer-events: none;
 }
 
+/* The flower stands on the horizon whole: small, with its ground just above the bottom edge. */
+html[data-graphic="flower"] .voxel-rest {
+  --horizon-size: min(26svh, 60vw);
+  --horizon-clip: 0.62;
+  top: calc(100% - 0.42 * var(--horizon-size));
+}
+html[data-graphic="flower"] .paper-fade {
+  --fade-solid: 21%;
+  --fade-clear: 36%;
+}
+
 @media (min-width: 1100px) {
-  .orb-rest {
+  .voxel-rest, html[data-graphic] .voxel-rest {
     --rest-brightness: 0.5;
     --horizon-clip: 0;
     left: 74%;
@@ -120,25 +131,25 @@ a:focus-visible, button:focus-visible {
 }
 
 /* The horizon's fade: a copy of the paper, shown only along the bottom, laid over the text but
-   under the orb. orb.js fades it in as the orb settles and lifts the orb above the text (.horizon). */
+   under the graphic. voxel.js fades it in as the graphic settles and lifts it above the text (.horizon). */
 .paper-fade {
   position: fixed;
   inset: 0;
   z-index: 1;
   background: var(--paper);
-  -webkit-mask-image: linear-gradient(to top, #000 15%, transparent 30%);
-  mask-image: linear-gradient(to top, #000 15%, transparent 30%);
+  -webkit-mask-image: linear-gradient(to top, #000 var(--fade-solid, 15%), transparent var(--fade-clear, 30%));
+  mask-image: linear-gradient(to top, #000 var(--fade-solid, 15%), transparent var(--fade-clear, 30%));
   opacity: 0;
   pointer-events: none;
 }
-html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
+html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 
 @media (min-width: 1100px) {
   .paper-fade { display: none; }
 }
 
-/* Where the orb glides while a project pane is open: beside the pane on desktop, above the sheet on phones. */
-.orb-focus {
+/* Where the graphic glides while a project pane is open: beside the pane on desktop, above the sheet on phones. */
+.voxel-focus {
   --focus-brightness: 0.95;
   position: fixed;
   left: 27%;
@@ -151,7 +162,7 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
 }
 
 @media (max-width: 800px) {
-  .orb-focus {
+  .voxel-focus {
     --focus-brightness: 0.9;
     left: 50%;
     top: 11svh;
@@ -171,10 +182,10 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
   gap: clamp(3rem, 11svh, 7rem);
   padding: var(--gutter);
   padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 60px);   /* room for the scroll cue */
-  pointer-events: none;   /* taps and hovers reach the orb canvas underneath */
+  pointer-events: none;   /* taps and hovers reach the canvas underneath */
 }
 
-.orb-slot {
+.voxel-slot {
   width: min(68vw, 52svh, 520px);   /* svh, not dvh: stays put while a phone's address bar hides */
   aspect-ratio: 1;
 }
@@ -217,7 +228,7 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
   border: 1px solid var(--line-strong);
   background: rgba(250, 248, 243, 0.6);
   color: var(--ink);
-  pointer-events: auto;   /* the rest of the hero lets pointers through to the orb */
+  pointer-events: auto;   /* the rest of the hero lets pointers through to the graphic */
   transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .hero-links a:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
@@ -250,8 +261,8 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
   max-width: 680px;
   margin: 0 auto;
   padding: 0 var(--gutter) 3rem;
-  pointer-events: none;   /* gaps beside the text reach the orb */
-  text-shadow: 0 0 10px var(--bg), 0 0 3px var(--bg);   /* lifts the text off the orb behind it */
+  pointer-events: none;   /* gaps beside the text reach the graphic */
+  text-shadow: 0 0 10px var(--bg), 0 0 3px var(--bg);   /* lifts the text off the graphic behind it */
   counter-reset: section;
 }
 .cv > * { pointer-events: auto; }
@@ -386,7 +397,7 @@ html.horizon #orb-canvas { z-index: 2; pointer-events: none; }
   margin: 0 0 2.75rem;
   padding-left: 2rem;
 }
-/* Each entry's marker is a small ink square with a scorch around it; its dots fly into the orb from here. */
+/* Each entry's marker is a small ink square with a scorch around it; its squares fly into the graphic from here. */
 .tl-marker {
   --c: var(--dot, var(--ink));
   --b: var(--dot, var(--burn));
@@ -719,7 +730,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .orb-halo, #orb-canvas, .paper-fade, .orb-rest, .orb-focus, .hero, .pdf-button, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }
