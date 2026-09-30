@@ -39,4 +39,10 @@ Research: look at how sites with large hero visuals, 3D scenes or canvas animati
 
 ## Publishing
 
-`gh-pages` is the live branch (custom domain in `CNAME`). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready. The earlier dark, blue-dot version is kept on `orb`.
+`gh-pages` is the live branch (custom domain in `CNAME`). GitHub Pages builds it with its standard Jekyll build, which copies the site as-is (`_config.yml` only keeps the notes unpublished). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready:
+
+```bash
+git switch gh-pages && git merge light && git push && git switch light
+```
+
+The earlier dark, blue-dot version is kept on `orb`, and the old Jekyll CV lives on in `gh-pages`' history. Its `projects.html` URL now redirects to `/#projects`. A planned move to `biunefrandsen.dk` is described in `DOMAIN-MIGRATION.md`.

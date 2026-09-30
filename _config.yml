@@ -1,0 +1,5 @@
+# GitHub Pages builds the gh-pages branch with Jekyll. The site itself is plain HTML, CSS and
+# JavaScript without front matter, so Jekyll copies it as-is; this only keeps the notes unpublished.
+exclude:
+  - README.md
+  - DOMAIN-MIGRATION.md
