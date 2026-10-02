@@ -540,7 +540,6 @@ export default {
   settle,
   press: () => { gust = 1; },
   halo: () => 0.35,
-  pressDelay: 0.6,
   sliders: [
     { group: 'Growing' },
     { key: 'growSeconds', label: 'Growth, soil to first petals (s)', min: 10, max: 120, step: 1, apply: () => rebuild() },

@@ -1140,8 +1140,6 @@ const orb = {
   focus: (on) => { if (on) gather(); },
   // The paper's scorch behind the orb swells a little while it "speaks".
   halo: () => 0.6 + voice.energy * CONFIG.speech * 0.8,
-  // After a press in the hero, let the falling squares be drawn in before gliding down to the CV.
-  get pressDelay() { return CONFIG.gatherSeconds + CONFIG.gatherJitter + 0.25; },
   sliders: [
     { group: 'Orb' },
     { key: 'dotCount', label: 'Number of dots', min: 1000, max: 20000, step: 500, apply: rebuildNow },

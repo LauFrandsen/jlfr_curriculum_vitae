@@ -1,5 +1,5 @@
 // Page behaviour around the graphic: picking it, section reveals, CV entries sending their squares
-// into it, project panes, the scroll cue, the PDF button, and gliding down to the CV after it's pressed.
+// into it, project panes, the scroll cue and the PDF button.
 
 import { dropFrom, reducedMotion, setFocus, start } from './voxel.js';
 
@@ -99,10 +99,3 @@ if (dialog) {
     opener?.focus({ preventScroll: true });
   });
 }
-
-// Pressing the graphic in the hero: let it react first (the graphic says how long), then glide down to the CV.
-document.addEventListener('voxel:pressed', (e) => {
-  if (!e.detail.inHero) return;
-  const wait = reducedMotion.matches ? 0 : e.detail.delay * 1000;
-  setTimeout(() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' }), wait);
-});
