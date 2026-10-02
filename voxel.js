@@ -461,6 +461,7 @@ const hero = { x: 0, y: 0, r: 100 };
 let rest = { x: 0, y: 0, r: 100, brightness: 1, clip: 0 };
 const focusPose = { x: 0, y: 0, r: 100, brightness: 1 };
 let heroSpan = 1;     // CSS px of scrolling over which the graphic glides to its rest position
+let heroClear = Infinity;   // device px from the graphic's centre in the hero down to [data-voxel-clear]
 let recede = 0;       // 0 = in the hero, 1 = at rest
 let focusTarget = 0;  // 1 while something (e.g. a project pane) has the graphic's attention
 let focus = 0;        // eased towards focusTarget
@@ -508,6 +509,9 @@ function layout() {
   if (focusEl) measure(focusEl, focusPose, '--focus-brightness');
   else Object.assign(focusPose, rest);
   heroSpan = Math.max(1, heroEl.offsetHeight * 0.85);
+  // What the graphic should keep clear of in the hero (the text under it), for graphics that reach out.
+  const clearEl = document.querySelector('[data-voxel-clear]');
+  heroClear = clearEl ? (clearEl.getBoundingClientRect().top + scrollY) * dpr - hero.y : Infinity;
   gl.viewport(0, 0, canvas.width, canvas.height);
   place();
 }
@@ -959,10 +963,12 @@ export function current() {
   return shown?.graphic ?? null;
 }
 
-// Where the graphic sits on the canvas, in device px: its centre, its radius and the canvas size. For
-// graphics that fit themselves to the room around them.
+// Where the graphic sits on the canvas, in device px: its centre, its radius and the canvas size; how
+// far it has glided from the hero to its rest (0..1); and in the hero, how far below its centre the
+// text it should keep clear of starts ([data-voxel-clear]). For graphics that fit themselves to the
+// room around them.
 export function stage() {
-  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height };
+  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, recede, clearBelow: heroClear };
 }
 
 export function getStats() {
