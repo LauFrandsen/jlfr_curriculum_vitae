@@ -2,6 +2,10 @@
 // from beyond the screen edges, settling into the orb and drifting back out. Each square that slots
 // in sends a faint ripple over the squares around it. Pressing the orb draws the falling squares in
 // and pauses new ones. Optional simulated "speech". Drawn by voxel.js.
+//
+// Its look can lean toward a network: squares arriving along traces or brought in by orbits, orbit
+// rings with satellites, antennas sending signals, a latitude/longitude grid that turns, and data arcs
+// drawing across the surface. LOOKS below has presets; the ?tune panel switches between them.
 
 import { STORY_DOTS, STORY_TOTAL, exact, rebuild, reducedMotion, storyLanded } from '../voxel.js';
 
@@ -13,14 +17,16 @@ export const CONFIG = {
   burnColor: [0.13, 0.085, 0.05], // ink of the scorch around them: near-black with a trace of umber
   breathSeconds: 14,          // one full in-and-out breath
   breathDepth: 0.025,         // how much the orb grows at the top of a breath, fraction of radius
-  tilt: 0,                    // radians around the X axis; the orb doesn't spin, this just sets the viewing angle
+  tilt: 0,                    // radians around the X axis: the viewing angle
   cameraDistance: 6.4,        // in orb radii; lower = stronger perspective
   dotSize: 0.042,             // sprite size (square + burn) as a fraction of the orb radius
   squareSize: 0.18,           // the solid square, as a share of the sprite
   burn: 0.55,                 // strength of the scorch around each square
   brightness: 1,              // overall ink strength
-  flowCount: 100,             // dots that fall in from the screen edges into their own slot in the orb
-  flowSeconds: 60,            // average length of one cycle: fall in, rest, drift out and fade
+  arrival: 0,                 // how flowing dots arrive: 0 = swimming in from every side, 1 = along
+                              //   traces from the sides, 2 = brought in by the orbits
+  flowCount: 100,             // dots that come in from outside into their own slot in the orb
+  flowSeconds: 60,            // average length of one cycle: come in, rest, drift out and fade
   flowLinger: 0.45,           // share of the cycle spent resting in the slot
   gravity: 8,                 // 0 = constant speed; higher = slower drift at first, faster pull at the end
   landing: 0.35,              // share of the fall spent braking into the slot (0 = arrive at full speed)
@@ -36,6 +42,16 @@ export const CONFIG = {
   rippleStrength: 0.004,      // how far a slotting-in square nudges the squares around it, fraction of radius (0 = off)
   rippleSpeed: 0.3,           // how fast the ripple spreads over the surface, orb radii per second
   rippleSeconds: 1.6,         // how long a ripple lasts before it has faded out
+  orbits: 0,                  // orbit rings around the orb, each with a satellite (0-3)
+  orbitSpeed: 1,              // how fast things travel along the orbits
+  antennas: 0,                // masts standing out from the surface, with signals running up them (0-12)
+  antennaLength: 0.32,        // how far the longest mast reaches, fraction of radius
+  gridLines: 0,               // shell dots on a latitude/longitude grid of this many parallels (0 = evenly spread)
+  gridFill: 0.15,             // with a grid: dots spread evenly between the lines, as a share of dotCount
+  spin: 0,                    // how fast the orb turns, radians per second
+  arcs: 0,                    // data arcs drawing across the surface at once (0-6)
+  arcLift: 0.16,              // how high the arcs lift off the surface, per radian they span
+  arcSeconds: 2.2,            // how long an arc takes to draw, and later to wipe
   speech: 0,                  // 0 = no simulated speech, 1 = full; scales everything below it
   voiceAmplitude: 0.035,      // core shell swell while "speaking", fraction of radius
   voiceSpeed: 1,              // how fast the lumps travel over the surface
@@ -52,12 +68,62 @@ export const CONFIG = {
   pullGlow: 0.02,             // how much pulled dots darken and burn wider (0 = none)
 };
 
+// Presets for the orb's look, applied over CONFIG.
+const LOOKS = {
+  Today: { arrival: 0, flowCount: 100, orbits: 0, antennas: 0, gridLines: 0, spin: 0, arcs: 0, looseFraction: 0.3, looseSpread: 0.36, tilt: 0 },
+  Circuit: { arrival: 1, flowCount: 100, orbits: 0, antennas: 0, gridLines: 0, spin: 0, arcs: 0, looseFraction: 0.06, looseSpread: 0.2, tilt: 0 },
+  Orbits: { arrival: 2, flowCount: 100, orbits: 3, antennas: 0, gridLines: 0, spin: 0, arcs: 0, looseFraction: 0.06, looseSpread: 0.2, tilt: 0.22 },
+  Globe: { arrival: 1, flowCount: 0, orbits: 0, antennas: 0, gridLines: 9, spin: 0.07, arcs: 5, looseFraction: 0.04, looseSpread: 0.15, tilt: 0.35 },
+  Antennas: { arrival: 1, flowCount: 100, orbits: 0, antennas: 9, gridLines: 0, spin: 0.05, arcs: 0, looseFraction: 0.06, looseSpread: 0.2, tilt: 0.22 },
+};
+
 // Ripples: the most recent slot-ins, each spreading out from where its square landed.
 const RIPPLES = 16;
+// Data arcs, drawn across the surface at most this many at a time, and how long one holds.
+const ARCS = 6;
+const ARC_SQUARES = 48;
+const ARC_HOLD = 1.2;
+
+// ---------- orbits ----------
+
+const TAU = Math.PI * 2;
+const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; };
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+// Three rings around the orb, tilted different ways, further out and slower each: the plane's normal,
+// the radius (orb radii) and the speed along it (radians per second; the sign is its direction).
+const ORBITS = [
+  { normal: [0.22, 1, 0.1], radius: 1.32, speed: 0.22 },
+  { normal: [-0.6, 0.55, 0.58], radius: 1.52, speed: -0.15 },
+  { normal: [0.62, 0.42, -0.66], radius: 1.72, speed: 0.11 },
+].map((o) => {
+  const n = norm3(o.normal);
+  const u = norm3(cross3(n, [0, 0, 1]));
+  return { ...o, u, v: cross3(n, u) };
+});
+const g3 = (v) => `vec3(${v.map((x) => x.toFixed(5)).join(', ')})`;
+const SATELLITE_STEP = 0.017;   // spacing of a satellite's squares (orb radii)
+
+// Orbit k's ring at angle a, dr further out than its radius, as the shader has it.
+function orbitAt(k, a, dr) {
+  const o = ORBITS[k], r = o.radius + dr;
+  return [0, 1, 2].map((i) => (Math.cos(a) * o.u[i] + Math.sin(a) * o.v[i]) * r);
+}
+
+// The orb's turn by angle a (the shader has the same).
+function spun(v, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c];
+}
 
 const SHADER = `
-attribute vec3 aPos;      // unit vector on the sphere
-attribute float aSeed;    // 0..1 shell, 1..2 loose, 2..3 flowing, 3..4 story
+attribute vec3 aPos;      // per kind (the whole part of aSeed): a unit vector on the sphere (0-3);
+                          // which orbit (4: x; 5: x, and the square's place in its satellite: y along
+                          // the orbit, z outward); a point on a mast (6); where on which arc (7: x =
+                          // how far along, y = which arc)
+attribute float aSeed;    // kind + 0..1: 0 shell, 1 loose, 2 flowing, 3 story, 4 orbit path,
+                          // 5 satellite, 6 antenna, 7 data arc; the fraction is its own random value
+                          // (orbits and satellites: its angle, as a share of a turn)
 
 uniform float uVoiceTime, uBreath, uTilt, uEnergy, uVoiceAmp;
 uniform float uLooseSpread, uLooseDrift, uLooseVoice;
@@ -65,6 +131,19 @@ uniform float uFlowTime, uFlowSeconds, uFlowLinger, uGravity, uFlowSwirl;
 uniform float uGatherStart, uGatherEnd, uGatherSeconds, uGatherJitter;
 uniform vec4 uRipple[${RIPPLES}];   // recent slot-ins: xyz = where (unit vector), w = when (seconds, uTime)
 uniform float uRippleStrength, uRippleSpeed, uRippleSeconds;
+uniform vec4 uNet;        // x = orbit time, y = the orb's turn (radians), z = how flowing dots arrive
+                          // (0 = swimming in, 1 = along traces from the sides, 2 = by orbit), w = orbits
+uniform vec4 uNet2;       // x = longest antenna, y = arc lift, z = seconds to draw an arc, w = seconds it holds
+uniform vec4 uArcA[${ARCS}];   // per arc: xyz = where it starts (unit vector, turning with the orb), w = when
+uniform vec4 uArcB[${ARCS}];   // xyz = where it ends
+
+// Orbit k's ring (k = 0, 1, 2) at angle a, dr further out than its radius; its radius and speed.
+vec3 orbitAt(float k, float a, float dr) {
+${ORBITS.map((o, k) => `  if (k < ${k}.5) return (cos(a) * ${g3(o.u)} + sin(a) * ${g3(o.v)}) * (${o.radius.toFixed(3)} + dr);`).join('\n')}
+  return vec3(0.0);
+}
+float orbitRadius(float k) { return k < 0.5 ? ${ORBITS[0].radius.toFixed(3)} : k < 1.5 ? ${ORBITS[1].radius.toFixed(3)} : ${ORBITS[2].radius.toFixed(3)}; }
+float orbitSpeed(float k) { return k < 0.5 ? ${ORBITS[0].speed.toFixed(3)} : k < 1.5 ? ${ORBITS[1].speed.toFixed(3)} : ${ORBITS[2].speed.toFixed(3)}; }
 
 // Ripples on the surface around recent slot-ins, at unit direction d: a single crest and trough
 // spreading outward, nudging dots along the surface (plus a whisper outward) and darkening the crest.
@@ -96,12 +175,50 @@ void main() {
   float fade = 1.0;
   float heat = 0.0;          // slot-in flash
   bool falling = false;
+  bool free = false;         // out in space (orbits, satellites): doesn't turn or breathe with the orb
   float fall = 1.0;          // falling dots: 0 = at the start point, 1 = in its slot
   vec2 fallStart = vec2(0.0);
   float wobbleAmt = 0.12;
   float fk = 0.0, fh1 = 0.0, fh2 = 0.0;
 
-  if (aSeed >= 3.0) {
+  if (aSeed >= 7.0) {
+    // Data arc: a stroke of squares drawn across the surface from one point to another, lifting off
+    // it in between, led by a dark packet; it holds a moment, then is wiped from its start.
+    vec4 a = vec4(0.0), b = vec4(0.0);
+    for (int i = 0; i < ${ARCS}; i++) {
+      if (float(i) == aPos.y) {
+        a = uArcA[i];
+        b = uArcB[i];
+      }
+    }
+    float along = aPos.x;
+    float age = uTime - a.w;
+    float head = clamp(age / uNet2.z, 0.0, 1.0);
+    float tail = clamp((age - uNet2.z - uNet2.w) / uNet2.z, 0.0, 1.0);
+    float span = acos(clamp(dot(a.xyz, b.xyz), -1.0, 1.0));
+    pos = normalize(mix(a.xyz, b.xyz, along) + vec3(1e-4)) * (1.01 + uNet2.y * span * sin(3.14159 * along));
+    if (age < 0.0 || along > head || along < tail) fade = 0.0;
+    if (age < uNet2.z) heat = exp(-pow((head - along) / 0.035, 2.0)) * 1.2;
+    else if (along > 0.95) heat = slotHeat(age - uNet2.z) * 0.6;   // it connects
+    looseDim = 0.85;
+  } else if (aSeed >= 6.0) {
+    // Antenna: a mast of squares standing out from the surface; signals run up it and off its tip.
+    pos = aPos;
+    float out1 = length(aPos) - 1.0;
+    float front = fract(uTime * 0.28 + (aSeed - 6.0)) * (uNet2.x + 0.3);
+    heat = exp(-pow((out1 - front) / 0.035, 2.0)) * 1.3;
+  } else if (aSeed >= 5.0) {
+    // Satellite: a small body with a panel to either side, travelling along its orbit.
+    float r = orbitRadius(aPos.x);
+    float angle = (aSeed - 5.0) * 6.2832 + orbitSpeed(aPos.x) * uNet.x + aPos.y * ${SATELLITE_STEP} / r;
+    pos = orbitAt(aPos.x, angle, aPos.z * ${SATELLITE_STEP});
+    free = true;
+  } else if (aSeed >= 4.0) {
+    // Orbit path: a dotted ring, fainter than what travels on it.
+    pos = orbitAt(aPos.x, (aSeed - 4.0) * 6.2832, 0.0);
+    free = true;
+    looseDim = 0.5;
+  } else if (aSeed >= 3.0) {
     // Story dot: a CV entry's squares, falling in from the entry's marker (see story()).
     float idx = floor((aSeed - 3.0) * ${STORY_TOTAL.toFixed(1)});
     fk = idx / 97.0;
@@ -110,10 +227,11 @@ void main() {
     wobbleAmt = 0.03;
     falling = story(idx, fall, fallStart, heat, fade);
   } else if (aSeed >= 2.0) {
-    // Flowing dot. Each has a reserved slot in the shell. Cycle: fall in from the screen edge
-    // as if pulled by gravity (barely moving at first, speeding up as it nears, braking into
-    // the slot), flare with burn, rest, then quietly drift outward and fade before starting again.
-    // Cycle length, phase and gather delay come from exact() so orb.js can tell when it slots in.
+    // Flowing dot. Each has a reserved slot in the shell. Cycle: come in from outside as if pulled by
+    // gravity (barely moving at first, speeding up as it nears, braking into the slot), flare with
+    // burn, rest, then quietly drift outward and fade before starting again. How it comes in depends
+    // on uNet.z (see below). Cycle length, phase and gather delay come from exact() so orb.js can tell
+    // when it slots in.
     fk = aSeed - 2.0;
     fh1 = hash(fk * 91.7);
     fh2 = exact(fk, 61.0);
@@ -124,7 +242,8 @@ void main() {
     float fallEnd = (1.0 - uFlowLinger) * 0.65;
     float restEnd = fallEnd + uFlowLinger;
     float fallTime = fallEnd * cycle;
-    float g = uGravity * (0.8 + 0.4 * h3);
+    // Along a trace it travels more evenly than when swimming or dropping in.
+    float g = uGravity * (0.8 + 0.4 * h3) * (uNet.z > 0.5 && uNet.z < 1.5 ? 0.35 : 1.0);
     float landed = -1.0;     // seconds since slotting in
     pos = aPos * (1.0 + (h3 - 0.5) * 0.03);
     looseDim = 0.8;
@@ -195,22 +314,54 @@ void main() {
 
   // Ripples from squares slotting in nearby move the shell and the dots resting in their slots.
   float rippleInk = 0.0;
-  if (aSeed < 1.0 || (aSeed >= 2.0 && !falling)) {
+  if (aSeed < 1.0 || (aSeed >= 2.0 && aSeed < 4.0 && !falling)) {
     vec4 rp = ripple(aPos);
     pos += rp.xyz;
     rippleInk = rp.w;
   }
-  pos *= uBreath;
+  // The orb breathes and turns; what's out in space doesn't.
+  if (!free) {
+    pos *= uBreath;
+    float cs = cos(uNet.y), sn = sin(uNet.y);
+    pos = vec3(pos.x * cs + pos.z * sn, pos.y, -pos.x * sn + pos.z * cs);
+  }
 
-  // No spin; just tilt around X for the viewing angle.
+  bool flowing = aSeed >= 2.0 && aSeed < 3.0;
+  if (falling && flowing && uNet.z > 1.5) {
+    // Brought in by an orbit: it appears on one, rides along it, then drops down to its slot.
+    float k = floor(fh1 * uNet.w);
+    float ride = 2.4 * sign(orbitSpeed(k)) * min(fall / 0.6, 1.0);
+    vec3 onRing = orbitAt(k, fh2 * 6.2832 + ride, 0.0);
+    pos = mix(onRing, pos, smoothstep(0.6, 1.0, fall));
+    falling = false;
+  }
+
+  // Tilt around X for the viewing angle.
   float ct = cos(uTilt), st = sin(uTilt);
   vec3 p = vec3(pos.x, pos.y * ct - pos.z * st, pos.y * st + pos.z * ct);
   float zn = p.z / length(p);
   float s;
   vec2 screen = project(p, s);
   float depth = clamp((zn + 1.0) * 0.5, 0.0, 1.0);
+  // Out from the surface and behind the orb: hidden by it.
+  if (aSeed >= 4.0) fade *= 1.0 - 0.85 * step(p.z, 0.0) * (1.0 - smoothstep(0.92, 1.04, length(p.xy) / uBreath));
 
-  if (falling) {
+  if (falling && flowing && uNet.z > 0.5) {
+    // Along a trace: in from the side of the screen near its slot's height, straight across with one
+    // right-angle jog on the way, like a signal on a circuit board.
+    float margin = uDotSize * uRadius * 2.0;
+    float edge = fh1 < 0.5 ? -margin : uResolution.x + margin;
+    float y0 = screen.y + (fh2 - 0.5) * uRadius * 0.7;
+    float xm = mix(edge, screen.x, 0.3 + 0.45 * hash(fk * 5.1 + 1.0));
+    float l1 = abs(xm - edge), l2 = abs(screen.y - y0), l3 = abs(screen.x - xm);
+    float d = fall * (l1 + l2 + l3);
+    screen = d < l1 ? vec2(mix(edge, xm, d / max(l1, 1e-3)), y0)
+           : d < l1 + l2 ? vec2(xm, mix(y0, screen.y, (d - l1) / max(l2, 1e-3)))
+           : vec2(mix(xm, screen.x, (d - l1 - l2) / max(l3, 1e-3)), screen.y);
+    s = mix(1.0, s, fall);
+    depth = mix(0.8, depth, fall);
+    zn = mix(0.6, zn, fall);
+  } else if (falling) {
     // Travel from the start point to exactly the slot. The path curls around the orb, more and
     // more as it nears (like a captured orbit), and wobbles organically while far out.
     float swirl = uFlowSwirl * (fh2 > 0.5 ? 1.0 : -1.0);
@@ -224,8 +375,8 @@ void main() {
   }
 
   // The rim gets a little extra ink so the silhouette reads; story dots may fall through the horizon.
-  emit(screen, s, depth, 1.0 - abs(zn), heat, looseDim * fade * (1.0 + rippleInk), uEnergy * 0.1,
-       mix(0.6, 1.0, looseDim), aSeed < 3.0);
+  emit(screen, s, depth, free ? 0.0 : 1.0 - abs(zn), heat, looseDim * fade * (1.0 + rippleInk), uEnergy * 0.1,
+       mix(0.6, 1.0, looseDim), aSeed < 3.0 || aSeed >= 4.0);
 }`;
 
 // ---------- the squares ----------
@@ -237,26 +388,87 @@ function randomDirection() {
   return [Math.cos(a) * r, y, Math.sin(a) * r];
 }
 
+// Squares along `lines` parallels and twice as many meridians (stopping short of the poles, where
+// they'd crowd), spaced evenly along each line.
+function gridPoints(lines) {
+  const step = 0.024;
+  const out = [];
+  for (let i = 0; i < lines; i++) {
+    const lat = (-0.5 + (i + 0.5) / lines) * Math.PI * 0.86;
+    const r = Math.cos(lat), y = Math.sin(lat);
+    const n = Math.max(8, Math.round((TAU * r) / step));
+    for (let j = 0; j < n; j++) out.push([Math.cos((j / n) * TAU) * r, y, Math.sin((j / n) * TAU) * r]);
+  }
+  const meridians = lines * 2;
+  const n = Math.round((Math.PI * 0.9) / step);
+  for (let k = 0; k < meridians; k++) {
+    const a = (k / meridians) * TAU;
+    for (let j = 0; j <= n; j++) {
+      const lat = (-0.45 + (0.9 * j) / n) * Math.PI;
+      out.push([Math.cos(a) * Math.cos(lat), Math.sin(lat), Math.sin(a) * Math.cos(lat)]);
+    }
+  }
+  return out;
+}
+
+// The decorations: orbit paths and their satellites, antennas and the data arcs' squares. They sit
+// right after the story dots, so they're always drawn whole.
+function decorations() {
+  const out = [];
+  for (let k = 0; k < Math.min(3, CONFIG.orbits); k++) {
+    const n = Math.round((TAU * ORBITS[k].radius) / 0.05);
+    for (let j = 0; j < n; j++) out.push([k, 0, 0, 4 + (j + 0.5) / n]);
+    // A satellite: a 2x2 body with a panel of three squares to either side, across its orbit.
+    const a = Math.random() * 0.999;
+    for (const [along, outward] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5],
+      [0, -1.8], [0, -2.8], [0, -3.8], [0, 1.8], [0, 2.8], [0, 3.8]]) out.push([k, along, outward, 5 + a]);
+  }
+  // Antennas: masts of different lengths, standing apart, each with a small cross at its tip.
+  const masts = [];
+  for (let k = 0; k < CONFIG.antennas; k++) {
+    let dir, tries = 0;
+    do dir = randomDirection(); while (tries++ < 50 && masts.some((m) => m[0] * dir[0] + m[1] * dir[1] + m[2] * dir[2] > 0.8));
+    masts.push(dir);
+    const length = CONFIG.antennaLength * (0.35 + 0.65 * Math.random());
+    const phase = Math.random() * 0.999;
+    for (let d = 0.03; d <= length; d += 0.022) out.push([dir[0] * (1 + d), dir[1] * (1 + d), dir[2] * (1 + d), 6 + phase]);
+    const t1 = norm3(cross3(dir, Math.abs(dir[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), t2 = cross3(dir, t1);
+    const tip = dir.map((x) => x * (1 + length + 0.022));
+    for (const [i, j] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      out.push([0, 1, 2].map((c) => tip[c] + (t1[c] * i + t2[c] * j) * 0.018).concat(6 + phase));
+    }
+  }
+  for (let k = 0; k < ARCS; k++) {
+    for (let j = 0; j < ARC_SQUARES; j++) out.push([(j + 0.5) / ARC_SQUARES, k, 0, 7.5]);
+  }
+  return out;
+}
+
 let storySlots = new Float32Array(0), flowSlots = [];
 let placed = new Float32Array(0);   // the data build() made last
 
-// Shell dots sit on an even Fibonacci lattice (seed 0..1); loose (seed 1..2) and
-// flowing (seed 2..3) dots get random directions. Story dots (seed 3..4) get slots on the
-// front of the orb, so their arrival is visible, and go first so they're never dropped.
+// Shell dots sit on an even Fibonacci lattice, or on a latitude/longitude grid (seed 0..1); loose
+// (seed 1..2) and flowing (seed 2..3) dots get random directions (on the grid, if there is one).
+// Story dots (seed 3..4) get slots on the front of the orb, so their arrival is visible, and go
+// first so they're never dropped; then the decorations.
 function build() {
-  const shellCount = CONFIG.dotCount;
-  const looseCount = Math.round(shellCount * CONFIG.looseFraction);
+  const looseCount = Math.round(CONFIG.dotCount * CONFIG.looseFraction);
   const flowCount = CONFIG.flowCount;
   const golden = Math.PI * (3 - Math.sqrt(5));
+  const grid = CONFIG.gridLines > 0 ? gridPoints(CONFIG.gridLines) : null;
+  const even = grid ? Math.round(CONFIG.dotCount * CONFIG.gridFill) : CONFIG.dotCount;
   const dots = [];
-  for (let i = 0; i < shellCount; i++) {
-    const y = 1 - (2 * (i + 0.5)) / shellCount;
+  for (const p of grid ?? []) dots.push([...p, 0.5]);
+  for (let i = 0; i < even; i++) {
+    const y = 1 - (2 * (i + 0.5)) / even;
     const r = Math.sqrt(1 - y * y);
     const a = i * golden;
     dots.push([Math.cos(a) * r, y, Math.sin(a) * r, Math.random()]);
   }
-  for (let i = 0; i < looseCount + flowCount; i++) {
-    dots.push([...randomDirection(), (i < looseCount ? 1 : 2) + Math.random()]);
+  for (let i = 0; i < looseCount; i++) dots.push([...randomDirection(), 1 + Math.random()]);
+  for (let i = 0; i < flowCount; i++) {
+    const slot = grid ? grid[Math.floor(Math.random() * grid.length)] : randomDirection();
+    dots.push([...slot, 2 + Math.random()]);
   }
   // Shuffle so drawing only the first k dots (on slow devices) still covers the sphere evenly.
   for (let i = dots.length - 1; i > 0; i--) {
@@ -269,7 +481,7 @@ function build() {
     do d = randomDirection(); while (d[2] < 0.3);
     story.push([...d, 3 + (i + 0.5) / STORY_TOTAL]);
   }
-  const all = story.concat(dots);
+  const all = story.concat(decorations(), dots);
   const data = new Float32Array(all.length * 4);
   all.forEach((d, k) => data.set(d, k * 4));
 
@@ -287,30 +499,48 @@ function build() {
   return data;
 }
 
-// Where the visible squares are, for morphing (see POSE in voxel.js): each at rest in its place,
-// as the shader draws it (without the loose dots' wandering and the flowing dots' travels).
-function pose() {
+// Where the visible squares are at engine time t, for morphing (see POSE in voxel.js): each at rest
+// in its place, as the shader draws it (without the loose dots' wandering, the flowing dots' travels
+// and the data arcs, which come and go).
+function pose(t) {
   const out = [];
   const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt);
+  const turn = spinAngle + (t - lastT) * CONFIG.spin;
+  const travelled = orbitTime + (t - lastT) * CONFIG.orbitSpeed;
   for (let i = 0; i < placed.length / 4; i++) {
     const seed = placed[i * 4 + 3];
-    let reach = 1 + (seed - 0.5) * 0.04, looseDim = 1;
-    if (seed >= 3) {
-      if (!storyLanded(Math.floor(i / STORY_DOTS))) continue;
-      reach = 1;
-    } else if (seed >= 2) {
-      looseDim = 0.8;
-      reach = 1;
-    } else if (seed >= 1) {
-      const outer = (seed - 1) ** 2;
-      reach = 1.01 + outer * CONFIG.looseSpread;
-      looseDim = 0.8 + (0.2 - 0.8) * outer;
+    const at = [placed[i * 4], placed[i * 4 + 1], placed[i * 4 + 2]];
+    let p, looseDim = 1, inSpace = false;
+    if (seed >= 7) continue;
+    if (seed >= 6) {
+      p = spun(at.map((x) => x * breath), turn);
+    } else if (seed >= 5) {
+      const k = at[0], o = ORBITS[k];
+      p = orbitAt(k, (seed - 5) * TAU + o.speed * travelled + (at[1] * SATELLITE_STEP) / o.radius, at[2] * SATELLITE_STEP);
+      inSpace = true;
+    } else if (seed >= 4) {
+      p = orbitAt(at[0], (seed - 4) * TAU, 0);
+      looseDim = 0.5;
+      inSpace = true;
+    } else {
+      let reach = 1 + (seed - 0.5) * 0.04;
+      if (seed >= 3) {
+        if (!storyLanded(Math.floor(i / STORY_DOTS))) continue;
+        reach = 1;
+      } else if (seed >= 2) {
+        looseDim = 0.8;
+        reach = 1;
+      } else if (seed >= 1) {
+        const outer = (seed - 1) ** 2;
+        reach = 1.01 + outer * CONFIG.looseSpread;
+        looseDim = 0.8 + (0.2 - 0.8) * outer;
+      }
+      p = spun(at.map((x) => x * reach * breath), turn);
     }
-    const k = reach * breath;
-    const x = placed[i * 4] * k, y = placed[i * 4 + 1] * k, z = placed[i * 4 + 2] * k;
+    const [x, y, z] = p;
     const py = y * ct - z * st, pz = y * st + z * ct;
     const zn = pz / Math.hypot(x, py, pz);
-    const rim = 1 - Math.abs(zn);
+    const rim = inSpace ? 0 : 1 - Math.abs(zn);
     out.push(x, py, pz, (zn + 1) / 2, looseDim, 0.6 + 0.4 * looseDim, 0.1 * rim * rim);
   }
   return new Float32Array(out);
@@ -386,6 +616,33 @@ function flowLandings(prev, now, t, activeCount) {
   }
 }
 
+// ---------- data arcs ----------
+
+// Each arc draws, holds, is wiped, and after a short pause starts again somewhere new: between two
+// points a little apart, starting on the side facing the viewer.
+const arcs = Array.from({ length: ARCS }, () => ({ a: [0, 0, 1], b: [0, 0, 1], start: -1e9 }));
+const arcA = new Float32Array(ARCS * 4), arcB = new Float32Array(ARCS * 4);
+
+function updateArcs(t) {
+  const life = 2 * CONFIG.arcSeconds + ARC_HOLD;
+  arcs.forEach((arc, i) => {
+    if (i >= CONFIG.arcs || reducedMotion.matches) {
+      arc.start = -1e9;
+    } else if (t > arc.start + life) {
+      let world;
+      do world = randomDirection(); while (world[2] < 0.25);
+      const a = spun(world, -spinAngle);
+      const side = norm3(cross3(a, randomDirection()));
+      const angle = 0.5 + Math.random() * 1.0;
+      const b = [0, 1, 2].map((c) => a[c] * Math.cos(angle) + side[c] * Math.sin(angle));
+      // The first arcs start spread out; later ones after a short pause.
+      Object.assign(arc, { a, b, start: arc.start < -1e8 ? t + Math.random() * life : t + 0.3 + Math.random() * 1.2 });
+    }
+    arcA.set([...arc.a, arc.start], i * 4);
+    arcB.set([...arc.b, 0], i * 4);
+  });
+}
+
 // ---------- simulated voice ----------
 
 const voice = { start: 0, end: 0, next: 0.6, level: 0, target: 0, nextSyllable: 0, energy: 0 };
@@ -428,18 +685,28 @@ function updateVoice(t, dt) {
 let breathPhase = 0;          // accumulated so changing breathSeconds never jumps
 let breath = 1;               // the orb's scale this frame
 let voiceTime = 0;            // accumulated separately so changing voiceSpeed never jumps
+let spinAngle = 0;            // how far the orb has turned
+let orbitTime = 0;            // how far along the orbits things have travelled (scaled by orbitSpeed)
+let lastT = 0;                // the frame clock at the last frame, for poses
 
 function frame({ t, dt, set, activeCount }) {
   updateVoice(t, dt);
+  const slow = reducedMotion.matches ? 0.3 : 1;
 
   // Breathing: smooth in-and-out scale, gentler with reduced motion.
   breathPhase += (dt * Math.PI * 2) / CONFIG.breathSeconds;
   const depth = reducedMotion.matches ? CONFIG.breathDepth * 0.5 : CONFIG.breathDepth;
   breath = 1 + depth * (0.5 - 0.5 * Math.cos(breathPhase));
   voiceTime += dt * CONFIG.voiceSpeed;
+  spinAngle += dt * CONFIG.spin * slow;
+  orbitTime += dt * CONFIG.orbitSpeed * slow;
+  lastT = t;
   const prevFlowTime = flowTime;
   flowTime += reducedMotion.matches ? dt * 0.5 : dt;
   flowLandings(prevFlowTime, flowTime, t, activeCount);
+  updateArcs(t);
+  // Brought in by orbits needs an orbit; without one, they come along traces.
+  const arrival = CONFIG.arrival >= 2 && CONFIG.orbits < 1 ? 1 : CONFIG.arrival;
 
   set('uBreath', breath);
   set('uTilt', CONFIG.tilt);
@@ -462,11 +729,21 @@ function frame({ t, dt, set, activeCount }) {
   set('uRippleStrength', CONFIG.rippleStrength);
   set('uRippleSpeed', CONFIG.rippleSpeed);
   set('uRippleSeconds', Math.max(0.1, CONFIG.rippleSeconds));
+  set('uNet', [orbitTime, spinAngle, arrival, Math.min(3, CONFIG.orbits)]);
+  set('uNet2', [CONFIG.antennaLength, CONFIG.arcLift, Math.max(0.2, CONFIG.arcSeconds), ARC_HOLD]);
+  set('uArcA', arcA);
+  set('uArcB', arcB);
 }
 
 // ---------- the graphic ----------
 
 const rebuildNow = () => rebuild();
+
+// Puts on one of the LOOKS.
+function look(name) {
+  Object.assign(CONFIG, LOOKS[name]);
+  rebuild();
+}
 
 export default {
   name: 'orb',
@@ -477,6 +754,7 @@ export default {
   frame,
   pose,
   onDrop,
+  look,
   press: gather,
   focus: (on) => { if (on) gather(); },
   // The paper's scorch behind the orb swells a little while it "speaks".
@@ -489,6 +767,18 @@ export default {
     { key: 'breathSeconds', label: 'Breath length (s)', min: 1, max: 20, step: 0.5 },
     { key: 'breathDepth', label: 'Breath depth', min: 0, max: 0.2, step: 0.005 },
     { key: 'tilt', label: 'Viewing angle', min: 0, max: 1.2, step: 0.01 },
+    { key: 'spin', label: 'Turning speed', min: 0, max: 0.5, step: 0.01 },
+    { group: 'Network' },
+    { key: 'arrival', label: 'Arrive: 0 swim, 1 trace, 2 orbit', min: 0, max: 2, step: 1 },
+    { key: 'orbits', label: 'Orbits with satellites', min: 0, max: 3, step: 1, apply: rebuildNow },
+    { key: 'orbitSpeed', label: 'Orbit speed', min: 0, max: 4, step: 0.1 },
+    { key: 'antennas', label: 'Antennas', min: 0, max: 12, step: 1, apply: rebuildNow },
+    { key: 'antennaLength', label: 'Antenna length', min: 0.05, max: 0.8, step: 0.01, apply: rebuildNow },
+    { key: 'gridLines', label: 'Grid parallels (0 = none)', min: 0, max: 16, step: 1, apply: rebuildNow },
+    { key: 'gridFill', label: 'Grid: dots between lines', min: 0, max: 1, step: 0.05, apply: rebuildNow },
+    { key: 'arcs', label: 'Data arcs', min: 0, max: ARCS, step: 1 },
+    { key: 'arcLift', label: 'Arc lift', min: 0, max: 0.5, step: 0.01 },
+    { key: 'arcSeconds', label: 'Arc draw time (s)', min: 0.4, max: 6, step: 0.1 },
     { group: 'Flow' },
     { key: 'flowCount', label: 'Flowing dots', min: 0, max: 1000, step: 10, apply: rebuildNow },
     { key: 'flowSeconds', label: 'Cycle length (s)', min: 4, max: 60, step: 1 },
@@ -516,5 +806,9 @@ export default {
     { key: 'looseDrift', label: 'Wander', min: 0, max: 0.2, step: 0.005 },
     { key: 'looseVoice', label: 'Push when speaking', min: 0, max: 0.6, step: 0.01 },
   ],
-  actions: { 'Draw in': gather, 'Speak now': speakNow },
+  actions: {
+    'Draw in': gather,
+    'Speak now': speakNow,
+    ...Object.fromEntries(Object.keys(LOOKS).map((name) => [`Look: ${name}`, () => look(name)])),
+  },
 };
