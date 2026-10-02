@@ -44,6 +44,10 @@ export const CONFIG = {
   rippleSeconds: 1.6,         // how long a ripple lasts before it has faded out
   orbits: 3,                  // orbit rings around the orb, each with a satellite (0-3)
   orbitSpeed: 1,              // how fast things travel along the orbits
+  landPauseMin: 25,           // with every orbit up, a satellite comes down after a random pause between these (s)
+  landPauseMax: 60,
+  relaunchMin: 5,             // a new rocket lifts off a random time between these after the touchdown (s)
+  relaunchMax: 10,
   antennas: 0,                // masts standing out from the surface, with signals running up them (0-12)
   antennaLength: 0.32,        // how far the longest mast reaches, fraction of radius
   gridLines: 0,               // shell dots on a latitude/longitude grid of this many parallels (0 = evenly spread)
@@ -106,13 +110,21 @@ const g3 = (v) => `vec3(${v.map((x) => x.toFixed(5)).join(', ')})`;
 const SATELLITE_STEP = 0.017;   // spacing of a satellite's squares (orb radii)
 const WIDEST = ORBITS[ORBITS.length - 1].radius;
 
-// The launch, once per visit, in orbit time (seconds, scaled by orbitSpeed): rocket k lifts off at
+// The launch, in orbit time (seconds, scaled by orbitSpeed): as the page opens, rocket k lifts off at
 // first + k * stagger and climbs for `ascent`. Reaching its orbit it unfolds into a satellite over
 // `deploy` and races round a first lap (`boost` radians on top of its cruising speed, easing off over
-// `ease`), dropping the orbit's dotted line behind it. `done` is when every orbit has been laid.
-const LAUNCH = { first: 0.8, stagger: 2.4, ascent: 2.8, deploy: 0.7, boost: TAU * 0.94, ease: 1.8, exhaust: 14 };
+// `ease`), dropping the orbit's dotted line behind it. `done` is when every orbit has been laid; `laid`
+// is how long after lift-off an orbit counts as up. Now and then a satellite comes down again (see
+// landings below): it folds up, leaves its orbit and takes `descent` to touch down on its pad, its
+// orbit dissolving behind it; a while later a new rocket lifts off from the same pad.
+const LAUNCH = { first: 0.8, stagger: 2.4, ascent: 2.8, deploy: 0.7, boost: TAU * 0.94, ease: 1.8, exhaust: 14, descent: 3.2 };
 LAUNCH.done = LAUNCH.first + 2 * LAUNCH.stagger + LAUNCH.ascent + 14;
-const launchTime = (k) => LAUNCH.first + k * LAUNCH.stagger;
+LAUNCH.laid = LAUNCH.ascent + 14;
+const NEVER = 1e9;
+const launches = [0, 1, 2].map((k) => LAUNCH.first + k * LAUNCH.stagger);   // when orbit k's rocket lifted off
+const lands = [NEVER, NEVER, NEVER];                                         // when its satellite began to come down
+const relaunches = [NEVER, NEVER, NEVER];                                    // when its next rocket lifts off
+const launchTime = (k) => launches[k];
 // How far (radians) satellite k has gone round its orbit s seconds after reaching it.
 const lapped = (k, s) => Math.abs(ORBITS[k].speed) * s + LAUNCH.boost * (1 - Math.exp(-s / LAUNCH.ease));
 
@@ -224,12 +236,17 @@ ${ORBITS.map((o, k) => `  if (k < ${k}.5) return (cos(a) * ${g3(o.u)} + sin(a) *
 float orbitSpeed(float k) { return k < 0.5 ? ${ORBITS[0].speed.toFixed(3)} : k < 1.5 ? ${ORBITS[1].speed.toFixed(3)} : ${ORBITS[2].speed.toFixed(3)}; }
 vec3 orbitNormal(float k) { return k < 0.5 ? ${g3(ORBITS[0].n)} : k < 1.5 ? ${g3(ORBITS[1].n)} : ${g3(ORBITS[2].n)}; }
 
-// The launch (see LAUNCH in orb.js), in orbit time: when rocket k lifts off, from where, and at which
+// The launches and landings (see LAUNCH in orb.js), in orbit time: when orbit k's rocket lifted off and
+// when its satellite began to come down (far in the future while it's up), from where, and at which
 // angle it reaches its orbit.
+uniform vec4 uLaunch;     // xyz = when orbit 0, 1, 2's rocket lifted off
+uniform vec4 uLand;       // xyz = when its satellite began to come down
 const float ASCENT = ${LAUNCH.ascent.toFixed(2)};
 const float DEPLOY = ${LAUNCH.deploy.toFixed(2)};
+const float DESCENT = ${LAUNCH.descent.toFixed(2)};
 const float EXHAUST = ${LAUNCH.exhaust.toFixed(1)};
-float launchTime(float k) { return ${LAUNCH.first.toFixed(2)} + k * ${LAUNCH.stagger.toFixed(2)}; }
+float launchTime(float k) { return k < 0.5 ? uLaunch.x : k < 1.5 ? uLaunch.y : uLaunch.z; }
+float landTime(float k) { return k < 0.5 ? uLand.x : k < 1.5 ? uLand.y : uLand.z; }
 float launchAngle(float k) { return k < 0.5 ? ${ORBITS[0].launch.toFixed(4)} : k < 1.5 ? ${ORBITS[1].launch.toFixed(4)} : ${ORBITS[2].launch.toFixed(4)}; }
 vec3 launchSite(float k) { return k < 0.5 ? ${g3(ORBITS[0].site)} : k < 1.5 ? ${g3(ORBITS[1].site)} : ${g3(ORBITS[2].site)}; }
 // How far (radians) satellite k has gone round its orbit s seconds after reaching it: a fast first lap
@@ -247,6 +264,17 @@ vec3 climb(float k, float q, out vec3 dir) {
   vec3 at = orbitAt(k, a, 0.0);
   vec3 tangent = normalize(orbitAt(k, a + 0.01 * sg, 0.0) - at);
   vec3 p0 = launchSite(k), p1 = p0 * 1.45, p2 = at - tangent * 0.55 * r, p3 = at;
+  float s = 1.0 - q;
+  dir = normalize(3.0 * s * s * (p1 - p0) + 6.0 * s * q * (p2 - p1) + 3.0 * q * q * (p3 - p2) + vec3(1e-5));
+  return s * s * s * p0 + 3.0 * s * s * q * p1 + 3.0 * s * q * q * p2 + q * q * q * p3;
+}
+// Satellite k coming down at progress q (0 = leaving its orbit at angle a, 1 = touching down): forward
+// out of its orbit, curving over and down onto its pad. dir = its heading.
+vec3 descend(float k, float a, float q, out vec3 dir) {
+  float sg = sign(orbitSpeed(k)), r = orbitRadius(k);
+  vec3 at = orbitAt(k, a, 0.0);
+  vec3 tangent = normalize(orbitAt(k, a + 0.01 * sg, 0.0) - at);
+  vec3 p0 = at, p1 = at + tangent * 0.55 * r, p3 = launchSite(k), p2 = p3 * 1.45;
   float s = 1.0 - q;
   dir = normalize(3.0 * s * s * (p1 - p0) + 6.0 * s * q * (p2 - p1) + 3.0 * q * q * (p3 - p2) + vec3(1e-5));
   return s * s * s * p0 + 3.0 * s * s * q * p1 + 3.0 * s * q * q * p2 + q * q * q * p3;
@@ -329,13 +357,30 @@ void main() {
   } else if (aSeed >= 5.0) {
     // Satellite: a small body with a panel to either side, travelling along its orbit. It goes up as a
     // rocket, folded: the body leading, the panels stacked in a column behind it. It climbs to its
-    // orbit, unfolds, and races round a first lap before easing into its cruising speed.
+    // orbit, unfolds, and races round a first lap before easing into its cruising speed. Coming down,
+    // it folds up again, leaves its orbit and lands on its pad, flaring as it touches down and sinking
+    // into the orb.
     float k = aPos.x, sg = sign(orbitSpeed(k)), r = orbitRadius(k);
     float tau = uNet.x - launchTime(k);
+    float down = uNet.x - landTime(k);
     float side = abs(aPos.z);
     float foldAlong = side < 1.0 ? aPos.y : -(side - 0.3) - (aPos.z < 0.0 ? 3.0 : 0.0);
     float foldOut = side < 1.0 ? aPos.z : 0.0;
-    if (tau < 0.0) {
+    if (down >= 0.0) {
+      float left = launchAngle(k) + sg * lapped(k, landTime(k) - launchTime(k) - ASCENT);
+      vec3 open = orbitAt(k, left + aPos.y * ${SATELLITE_STEP} / r, aPos.z * ${SATELLITE_STEP});
+      vec3 dir;
+      float u = clamp(down / DESCENT, 0.0, 1.0);
+      vec3 c = descend(k, left, 1.0 - pow(1.0 - u, 1.6), dir);
+      vec3 across = normalize(cross(dir, orbitNormal(k)) + vec3(1e-5));
+      vec3 folded = c + dir * foldAlong * ${SATELLITE_STEP} + across * foldOut * ${SATELLITE_STEP};
+      pos = mix(open, folded, smoothstep(0.0, 0.5, down));
+      float landed = down - DESCENT;
+      if (landed > 0.0) {
+        heat = slotHeat(landed) * 0.4;
+        fade = 1.0 - smoothstep(0.2, 1.2, landed);
+      }
+    } else if (tau < 0.0) {
       fade = 0.0;
       pos = launchSite(k);
     } else if (tau < ASCENT) {
@@ -355,7 +400,8 @@ void main() {
     free = true;
   } else if (aSeed >= 4.0) {
     // Orbit path: a dotted ring, fainter than what travels on it, dropped by its satellite on its first
-    // lap: each square appears as the satellite passes, dark at first and cooling behind it.
+    // lap: each square appears as the satellite passes, dark at first and cooling behind it. Once its
+    // satellite has left, it dissolves square by square.
     float k = aPos.x;
     float phi = (aSeed - 4.0) * 6.2832;
     pos = orbitAt(k, phi, 0.0);
@@ -366,6 +412,7 @@ void main() {
     float gone = s < 0.0 ? -1.0 : lapped(k, s);
     if (gone < ahead) fade = 0.0;
     else heat = exp(-(gone - ahead) / lapSpeed(k, s) * 1.4) * 1.1;
+    fade *= 1.0 - smoothstep(0.0, 0.5, uNet.x - landTime(k) - 0.4 - hash(aSeed * 91.3) * 2.2);
   } else if (aSeed >= 3.0) {
     // Story dot: a CV entry's squares, falling in from the entry's marker (see story()).
     float idx = floor((aSeed - 3.0) * ${STORY_TOTAL.toFixed(1)});
@@ -476,11 +523,11 @@ void main() {
 
   bool flowing = aSeed >= 2.0 && aSeed < 3.0;
   if (falling && flowing && uNet.z > 1.5) {
-    // Brought in by an orbit: it appears on one, rides along it, then drops down to its slot. Not
-    // until that orbit has been laid.
+    // Brought in by an orbit: it appears on one, rides along it, then drops down to its slot. Only
+    // while that orbit is up: laid, and its satellite not come down.
     float k = floor(fh1 * uNet.w);
     float laid = uNet.x - launchTime(k) - ASCENT;
-    if (laid < 0.0 || lapped(k, laid) < 6.2832) fade = 0.0;
+    if (laid < 0.0 || lapped(k, laid) < 6.2832 || uNet.x >= landTime(k)) fade = 0.0;
     float ride = 2.4 * sign(orbitSpeed(k)) * min(fall / 0.6, 1.0);
     vec3 onRing = orbitAt(k, fh2 * 6.2832 + ride, 0.0);
     pos = mix(onRing, pos, smoothstep(0.6, 1.0, fall));
@@ -665,7 +712,7 @@ function pose(t) {
       p = spun(at.map((x) => x * breath), turn);
     } else if (seed >= 5) {
       const k = at[0], o = ORBITS[k], tau = travelled - launchTime(k);
-      if (tau < 0) continue;
+      if (tau < 0 || travelled >= lands[k]) continue;
       if (tau < LAUNCH.ascent) p = climbAt(k, (tau / LAUNCH.ascent) ** 1.6);
       else {
         const angle = o.launch + o.sign * lapped(k, tau - LAUNCH.ascent);
@@ -675,7 +722,7 @@ function pose(t) {
     } else if (seed >= 4) {
       const k = at[0], o = ORBITS[k], phi = (seed - 4) * TAU, s = travelled - launchTime(k) - LAUNCH.ascent;
       const ahead = ((((phi - o.launch) * o.sign) % TAU) + TAU) % TAU;
-      if (s < 0 || lapped(k, s) < ahead) continue;
+      if (s < 0 || lapped(k, s) < ahead || travelled >= lands[k]) continue;
       p = orbitAt(k, phi, 0);
       looseDim = 0.5;
       inSpace = true;
@@ -839,6 +886,58 @@ function updateVoice(t, dt) {
 
 // ---------- frame ----------
 
+// ---------- satellites coming down and going up again ----------
+
+// Once every orbit is up, after a pause one satellite comes down (only ever one at a time), touching down
+// on its pad with a ripple through the orb's surface; a while after, a new rocket lifts off from the same
+// pad and lays its orbit again.
+let nextLanding = NEVER;      // orbit time when the next satellite comes down
+
+const orbitUp = (k) => orbitTime > launches[k] + LAUNCH.laid && lands[k] === NEVER;
+
+// Whether satellite k is on the front half of its orbit now (as seen from the viewing angle), so its
+// way down can be seen.
+function inFront(k) {
+  const o = ORBITS[k];
+  const [, y, z] = orbitAt(k, o.launch + o.sign * lapped(k, orbitTime - launches[k] - LAUNCH.ascent), 0);
+  return y * Math.sin(CONFIG.tilt) + z * Math.cos(CONFIG.tilt) > 0.15;
+}
+
+function landings(t) {
+  const count = Math.min(3, CONFIG.orbits);
+  for (let k = 0; k < count; k++) {
+    if (orbitTime >= relaunches[k]) {
+      launches[k] = orbitTime;
+      lands[k] = relaunches[k] = NEVER;
+    }
+  }
+  if (reducedMotion.matches || count === 0) return;
+  const up = [...Array(count).keys()].filter(orbitUp);
+  if (nextLanding === NEVER && up.length === count) nextLanding = orbitTime + rand(CONFIG.landPauseMin, CONFIG.landPauseMax);
+  // When it's time, a satellite on the front of its orbit comes down; if none is, it waits for one.
+  const ready = up.filter(inFront);
+  if (orbitTime >= nextLanding && up.length === count && ready.length) {
+    nextLanding = NEVER;
+    landSatellite(ready[Math.floor(Math.random() * ready.length)], t);
+  }
+}
+
+// Brings satellite k down now (t is the frame clock, for its touchdown ripple).
+function landSatellite(k, t) {
+  lands[k] = orbitTime;
+  relaunches[k] = orbitTime + LAUNCH.descent + 1 + rand(CONFIG.relaunchMin, CONFIG.relaunchMax);
+  scheduled.push({ dir: ORBITS[k].site, time: t + LAUNCH.descent / Math.max(CONFIG.orbitSpeed, 0.01) });
+}
+
+// All orbits up, as if launched long ago (morphed into, or launched again from the start).
+function orbitsUp(since) {
+  for (let k = 0; k < 3; k++) {
+    if (orbitTime < launches[k] + LAUNCH.laid || lands[k] !== NEVER) launches[k] = orbitTime - since;
+    lands[k] = relaunches[k] = NEVER;
+  }
+  nextLanding = NEVER;
+}
+
 let breathPhase = 0;          // accumulated so changing breathSeconds never jumps
 let breath = 1;               // the orb's scale this frame
 let voiceTime = 0;            // accumulated separately so changing voiceSpeed never jumps
@@ -858,8 +957,9 @@ function frame({ t, dt, set, activeCount }) {
   voiceTime += dt * CONFIG.voiceSpeed;
   spinAngle += dt * CONFIG.spin * slow;
   orbitTime += dt * CONFIG.orbitSpeed * slow;
-  if (reducedMotion.matches) orbitTime = Math.max(orbitTime, LAUNCH.done);   // no launch: the orbits are up
+  if (reducedMotion.matches && orbitTime < LAUNCH.done) orbitsUp(LAUNCH.laid + 30);   // no launch: the orbits are up
   lastT = t;
+  landings(t);
   const prevFlowTime = flowTime;
   flowTime += reducedMotion.matches ? dt * 0.5 : dt;
   flowLandings(prevFlowTime, flowTime, t, activeCount);
@@ -893,6 +993,8 @@ function frame({ t, dt, set, activeCount }) {
   set('uNet2', [CONFIG.antennaLength, CONFIG.arcLift, Math.max(0.2, CONFIG.arcSeconds), orbitFit]);
   set('uArcA', arcA);
   set('uArcB', arcB);
+  set('uLaunch', [launches[0], launches[1], launches[2], 0]);
+  set('uLand', [lands[0], lands[1], lands[2], 0]);
 }
 
 // ---------- the graphic ----------
@@ -916,7 +1018,7 @@ const orb = {
   onDrop,
   look,
   // Morphed into, it arrives with its orbits up (the launch plays once per visit, as the page opens).
-  settle: () => { orbitTime = Math.max(orbitTime, LAUNCH.done); },
+  settle: () => orbitsUp(LAUNCH.laid + 30),
   press: gather,
   focus: (on) => { if (on) gather(); },
   // The paper's scorch behind the orb swells a little while it "speaks".
@@ -934,6 +1036,10 @@ const orb = {
     { key: 'arrival', label: 'Arrive: 0 swim, 1 trace, 2 orbit', min: 0, max: 2, step: 1 },
     { key: 'orbits', label: 'Orbits with satellites', min: 0, max: 3, step: 1, apply: rebuildNow },
     { key: 'orbitSpeed', label: 'Orbit speed', min: 0, max: 4, step: 0.1 },
+    { key: 'landPauseMin', label: 'Satellite lands after at least (s)', min: 2, max: 120, step: 1 },
+    { key: 'landPauseMax', label: 'Satellite lands after at most (s)', min: 2, max: 180, step: 1 },
+    { key: 'relaunchMin', label: 'Relaunch after at least (s)', min: 0, max: 30, step: 0.5 },
+    { key: 'relaunchMax', label: 'Relaunch after at most (s)', min: 0, max: 30, step: 0.5 },
     { key: 'antennas', label: 'Antennas', min: 0, max: 12, step: 1, apply: rebuildNow },
     { key: 'antennaLength', label: 'Antenna length', min: 0.05, max: 0.8, step: 0.01, apply: rebuildNow },
     { key: 'gridLines', label: 'Grid parallels (0 = none)', min: 0, max: 16, step: 1, apply: rebuildNow },
@@ -969,7 +1075,20 @@ const orb = {
     { key: 'looseVoice', label: 'Push when speaking', min: 0, max: 0.6, step: 0.01 },
   ],
   actions: {
-    'Launch again': () => { orbitTime = 0; },
+    'Launch again': () => {
+      orbitTime = 0;
+      for (let k = 0; k < 3; k++) {
+        launches[k] = LAUNCH.first + k * LAUNCH.stagger;
+        lands[k] = relaunches[k] = NEVER;
+      }
+      nextLanding = NEVER;
+    },
+    // Brings a satellite down now: one on the front of its orbit if there is one.
+    'Land a satellite': () => {
+      const up = [...Array(Math.min(3, CONFIG.orbits)).keys()].filter(orbitUp);
+      const pick = up.filter(inFront).length ? up.filter(inFront) : up;
+      if (pick.length) landSatellite(pick[Math.floor(Math.random() * pick.length)], lastT);
+    },
     'Draw in': gather,
     'Speak now': speakNow,
     ...Object.fromEntries(Object.keys(LOOKS).map((name) => [`Look: ${name}`, () => look(name)])),
