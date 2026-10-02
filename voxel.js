@@ -564,8 +564,10 @@ export function setFocus(on) {
 const pointer = { x: 0, y: 0, tx: 0, ty: 0, active: false, strength: 0 };
 
 function setPointer(e) {
-  // Only pull when the pointer is over the canvas itself, not over text or controls.
-  if (e.target !== canvas) { pointer.active = false; return; }
+  // Only when the pointer is over open space, not over text or controls. The canvas sits behind the
+  // page (z-index -1), so over open space the browser reports the body (or the root), not the canvas.
+  const open = e.target === canvas || e.target === document.body || e.target === document.documentElement;
+  if (!open) { pointer.active = false; return; }
   pointer.tx = e.clientX;
   pointer.ty = e.clientY;
   if (!pointer.active && pointer.strength < 0.01) { pointer.x = pointer.tx; pointer.y = pointer.ty; }
@@ -582,8 +584,9 @@ const onCanvas = (e) => ({ x: e.clientX * dpr, y: e.clientY * dpr });
 function listen() {
   addEventListener('pointermove', (e) => {
     setPointer(e);
-    const own = !morph && shown.graphic.over?.(onCanvas(e));
-    canvas.style.cursor = pointer.active && (own || overGraphic(e)) ? 'pointer' : '';
+    const own = pointer.active && !morph && shown.graphic.over?.(onCanvas(e));
+    // On the body, since that's what the pointer is over (see setPointer).
+    document.body.style.cursor = pointer.active && (own || overGraphic(e)) ? 'pointer' : '';
   });
   addEventListener('pointerdown', (e) => {
     setPointer(e);
