@@ -128,7 +128,13 @@ function open(graphic) {
     b.addEventListener('click', () => act(b));
     buttons.append(b);
   };
-  for (const [text, act] of Object.entries(graphic.actions || {})) button(text, act);
+  // A graphic's own buttons may change its settings (presets), so the sliders follow.
+  for (const [text, act] of Object.entries(graphic.actions || {})) {
+    button(text, () => {
+      act();
+      controls.forEach((sync) => sync());
+    });
+  }
   button('Next graphic', () => next());
   button('Copy values', async (b) => {
     const round = (c) => c.map((v) => +v.toFixed(3));

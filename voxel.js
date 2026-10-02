@@ -386,14 +386,65 @@ function layerFor(graphic) {
 // The layer whose graphic's frame() is running, if any.
 let framing = null;
 
-// (Re)builds a graphic's squares: from within its frame(), that graphic's; otherwise the one being
-// shown. keepQuality keeps the adaptive quality's findings, for graphics that rebuild as they animate.
-export function rebuild({ keepQuality = false } = {}) {
-  const layer = framing ?? shown;
+// (Re)builds a graphic's squares: `graphic`'s if given (if it has been shown; otherwise it's built when
+// it is), from within a frame() that graphic's, otherwise the one being shown. keepQuality keeps the
+// adaptive quality's findings, for graphics that rebuild as they animate.
+export function rebuild({ keepQuality = false, graphic = null } = {}) {
+  const layer = graphic ? layers.get(graphic) : framing ?? shown;
   if (!layer) return;
   upload(layer, layer.graphic.build());
-  if (framing) use(layer);
-  if (!keepQuality) resetQuality();
+  if (layer === framing) use(layer);
+  if (!keepQuality && layer === shown) resetQuality();
+}
+
+// Orders items so that any first share of them is spread evenly over where they sit (at(item) gives a
+// point, in stage units): an item comes early only if no earlier one lies within a distance that
+// shrinks step by step (blue noise), so the order fills in coarse to fine. Drawing only the first part
+// of a graphic on a slow device then thins it evenly instead of leaving holes and clumps.
+export function evenOrder(items, at) {
+  const left = items.slice();
+  for (let i = left.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [left[i], left[j]] = [left[j], left[i]];
+  }
+  const out = [], placed = [];
+  for (let r = 0.5; left.length && r > 0.008; r /= Math.SQRT2) {
+    // The items placed so far, in cells of size r, so only neighbouring cells need checking.
+    const cells = new Map();
+    const cellOf = (p) => [Math.floor(p[0] / r), Math.floor(p[1] / r), Math.floor(p[2] / r)];
+    const key = (x, y, z) => ((x + 1024) * 2048 + (y + 1024)) * 2048 + (z + 1024);
+    const add = (p) => {
+      const [x, y, z] = cellOf(p);
+      const k = key(x, y, z);
+      if (cells.has(k)) cells.get(k).push(p);
+      else cells.set(k, [p]);
+    };
+    placed.forEach(add);
+    for (let i = 0; i < left.length; ) {
+      const p = at(left[i]);
+      const [x, y, z] = cellOf(p);
+      let near = false;
+      for (let dx = -1; dx <= 1 && !near; dx++) {
+        for (let dy = -1; dy <= 1 && !near; dy++) {
+          for (let dz = -1; dz <= 1 && !near; dz++) {
+            for (const q of cells.get(key(x + dx, y + dy, z + dz)) ?? []) {
+              if ((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2 < r * r) { near = true; break; }
+            }
+          }
+        }
+      }
+      if (near) {
+        i++;
+      } else {
+        add(p);
+        placed.push(p);
+        out.push(left[i]);
+        left[i] = left[left.length - 1];
+        left.pop();
+      }
+    }
+  }
+  return out.concat(left);
 }
 
 // ---------- layout ----------
@@ -410,6 +461,7 @@ const hero = { x: 0, y: 0, r: 100 };
 let rest = { x: 0, y: 0, r: 100, brightness: 1, clip: 0 };
 const focusPose = { x: 0, y: 0, r: 100, brightness: 1 };
 let heroSpan = 1;     // CSS px of scrolling over which the graphic glides to its rest position
+let heroClear = Infinity;   // device px from the graphic's centre in the hero down to [data-voxel-clear]
 let recede = 0;       // 0 = in the hero, 1 = at rest
 let focusTarget = 0;  // 1 while something (e.g. a project pane) has the graphic's attention
 let focus = 0;        // eased towards focusTarget
@@ -457,6 +509,9 @@ function layout() {
   if (focusEl) measure(focusEl, focusPose, '--focus-brightness');
   else Object.assign(focusPose, rest);
   heroSpan = Math.max(1, heroEl.offsetHeight * 0.85);
+  // What the graphic should keep clear of in the hero (the text under it), for graphics that reach out.
+  const clearEl = document.querySelector('[data-voxel-clear]');
+  heroClear = clearEl ? (clearEl.getBoundingClientRect().top + scrollY) * dpr - hero.y : Infinity;
   gl.viewport(0, 0, canvas.width, canvas.height);
   place();
 }
@@ -589,7 +644,8 @@ function spatialOrder(pose) {
 
 // The morph's squares: every square of the smaller pose paired with one spread evenly over the
 // larger pose's order; the larger pose's other squares come in from, or leave to, the side. Each sets
-// off by its height, bottom first. Shuffled, so drawing only the first k still looks whole.
+// off by its height, bottom first. Ordered evenly by where they end up (or, leaving, where they start),
+// so drawing only the first k still looks whole.
 function morphData(from, to) {
   const a = spatialOrder(from), b = spatialOrder(to);
   const squares = [];
@@ -617,12 +673,9 @@ function morphData(from, to) {
     if (large === a) put(l, 0, 2, k / large.length);
     else put(0, l, 1, k / large.length);
   });
-  for (let i = squares.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    [squares[i], squares[j]] = [squares[j], squares[i]];
-  }
-  const data = new Float32Array(squares.length * 16);
-  squares.forEach((s, k) => data.set(s, k * 16));
+  const ordered = evenOrder(squares, (s) => (Math.floor(s[15]) === 2 ? s : s.slice(4, 7)));
+  const data = new Float32Array(ordered.length * 16);
+  ordered.forEach((s, k) => data.set(s, k * 16));
   return data;
 }
 
@@ -772,15 +825,19 @@ function frame(nowMs) {
 }
 
 // ---------- adaptive quality ----------
-// Judged in 2-second windows. Below ~45 fps: draw fewer squares, then render at a lower pixel ratio.
-// Every cut is an experiment: if the next window isn't faster, the device is frame-capped
-// (e.g. battery saver at 30 fps) rather than overloaded, so the cut is undone and adapting stops.
-// When it runs smoothly again, squares come back gradually, never above a share that proved too slow.
-// The share applies to every layer. Layers shuffle their data (graphics keep story squares first),
-// so drawing only the first part still looks whole.
+// Judged in 2-second windows. Below ~45 fps: render at a slightly lower pixel ratio first (hardly
+// visible on a phone's dense screen, and the squares' burn makes every pixel count), then draw fewer
+// squares, then the lowest pixel ratio. Every cut is an experiment: if the next window isn't faster,
+// the device is frame-capped (e.g. battery saver at 30 fps) rather than overloaded, so the cut is
+// undone and adapting stops. When it runs smoothly again, quality comes back step by step in reverse,
+// never up to a step that proved too slow. The share of squares applies to every layer; layers order
+// their data evenly (evenOrder; graphics keep story squares first), so drawing only the first part
+// thins them evenly instead of leaving holes.
 
 let detail = 1;       // share of each layer's squares drawn
 let quality;
+const SHARP = 2, SOFT = 1.5, SOFTEST = 1;   // the pixel ratios it steps between
+const effective = (cap) => Math.min(window.devicePixelRatio || 1, cap);
 
 function activeOf(layer) {
   const min = Math.min(layer.count, shown?.graphic.CONFIG.minDotCount ?? 0);
@@ -788,9 +845,14 @@ function activeOf(layer) {
 }
 
 function resetQuality() {
-  quality = { frames: 0, time: 0, pending: null, blocked: false, goodWindows: 0, justRaised: false, ceiling: Infinity };
+  quality = { frames: 0, time: 0, pending: null, blocked: false, goodWindows: 0, justRaised: null, ceiling: Infinity, dprCeiling: Infinity };
 }
 resetQuality();
+
+function setDpr(cap) {
+  maxDpr = cap;
+  layout();
+}
 
 function adaptQuality(rawDt) {
   if (document.hidden || rawDt > 0.25) {        // a pause (hidden tab, window switch), not slowness
@@ -820,35 +882,33 @@ function adaptQuality(rawDt) {
 
   const minDetail = Math.min(1, (shown.graphic.CONFIG.minDotCount || 0) / shown.count);
   if (fps < 45) {
-    if (quality.justRaised) quality.ceiling = detail;    // the last increase was too much
+    // The last increase was too much: don't go back up to it.
+    if (quality.justRaised === 'detail') quality.ceiling = detail;
+    if (quality.justRaised === 'dpr') quality.dprCeiling = maxDpr;
     const before = { fps, detail, dpr: maxDpr };
-    if (detail > minDetail) {
-      detail = Math.max(minDetail, detail * 0.75);
-    } else if (maxDpr > 1) {
-      maxDpr = Math.max(1, maxDpr - 0.5);
-      layout();
-    } else {
-      return;
-    }
+    if (effective(SOFT) < effective(maxDpr)) setDpr(SOFT);
+    else if (detail > minDetail) detail = Math.max(minDetail, detail * 0.75);
+    else if (effective(SOFTEST) < effective(maxDpr)) setDpr(SOFTEST);
+    else return;
     quality.pending = before;
     quality.goodWindows = 0;
-    quality.justRaised = false;
+    quality.justRaised = null;
     return;
   }
 
-  quality.justRaised = false;
+  quality.justRaised = null;
   if (fps > 56 && ++quality.goodWindows >= 3) {
     quality.goodWindows = 0;
-    if (maxDpr < 2) {
-      maxDpr = Math.min(2, maxDpr + 0.5);
-      layout();
-      quality.justRaised = true;
-    } else {
-      const raised = Math.min(1, quality.ceiling * 0.99, detail * 1.15);
-      if (raised > detail) {
-        detail = raised;
-        quality.justRaised = true;
-      }
+    const raised = Math.min(1, quality.ceiling * 0.99, detail * 1.15);
+    if (maxDpr < SOFT && quality.dprCeiling > SOFT) {
+      setDpr(SOFT);
+      quality.justRaised = 'dpr';
+    } else if (raised > detail) {
+      detail = raised;
+      quality.justRaised = 'detail';
+    } else if (maxDpr < SHARP && quality.dprCeiling > SHARP) {
+      setDpr(SHARP);
+      quality.justRaised = 'dpr';
     }
   }
 }
@@ -901,6 +961,14 @@ export function start(g, rotate) {
 // The graphic being shown, for the tune panel.
 export function current() {
   return shown?.graphic ?? null;
+}
+
+// Where the graphic sits on the canvas, in device px: its centre, its radius and the canvas size; how
+// far it has glided from the hero to its rest (0..1); and in the hero, how far below its centre the
+// text it should keep clear of starts ([data-voxel-clear]). For graphics that fit themselves to the
+// room around them.
+export function stage() {
+  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, recede, clearBelow: heroClear };
 }
 
 export function getStats() {
