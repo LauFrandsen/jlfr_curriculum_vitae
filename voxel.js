@@ -23,7 +23,7 @@
 //               the ink, size and boost it passes to emit().
 //   Optional: settle() (put itself in its finished state before it's morphed into, e.g. fully grown),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
-//   pressDelay (seconds before the page glides to the CV after a press in the hero), over(at) and
+//   over(at) and
 //   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
 //   there, tap handles a tap and returns true if it hit one), and for the tune panel sliders and actions.
 
@@ -592,13 +592,7 @@ function listen() {
     setPointer(e);
     // A tap on one of the graphic's own targets (like a satellite) is the graphic's alone.
     if (pointer.active && !morph && shown.graphic.tap?.(onCanvas(e))) return;
-    if (pointer.active && overGraphic(e)) {
-      if (!morph) shown.graphic.press?.();
-      // Lets the page react (e.g. glide down to the CV) when the graphic is pressed in the hero.
-      document.dispatchEvent(new CustomEvent('voxel:pressed', {
-        detail: { inHero: recede < 0.05, delay: morph ? 0.5 : shown.graphic.pressDelay ?? 0.5 },
-      }));
-    }
+    if (pointer.active && overGraphic(e) && !morph) shown.graphic.press?.();
   });
   addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') pointer.active = false; });
   addEventListener('pointercancel', () => { pointer.active = false; });
