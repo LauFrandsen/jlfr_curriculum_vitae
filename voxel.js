@@ -23,8 +23,9 @@
 //               the ink, size and boost it passes to emit().
 //   Optional: settle() (put itself in its finished state before it's morphed into, e.g. fully grown),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
-//   pressDelay (seconds before the page glides to the CV after a press in the hero), and for the
-//   tune panel sliders and actions.
+//   pressDelay (seconds before the page glides to the CV after a press in the hero), over(at) and
+//   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
+//   there, tap handles a tap and returns true if it hit one), and for the tune panel sliders and actions.
 
 export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -575,13 +576,19 @@ function overGraphic(e) {
   return Math.hypot(e.clientX * dpr - cx, e.clientY * dpr - cy) < radius * 1.05;
 }
 
+// A pointer's place on the canvas, in device px, for a graphic's own targets (graphic.over / tap).
+const onCanvas = (e) => ({ x: e.clientX * dpr, y: e.clientY * dpr });
+
 function listen() {
   addEventListener('pointermove', (e) => {
     setPointer(e);
-    canvas.style.cursor = pointer.active && overGraphic(e) ? 'pointer' : '';
+    const own = !morph && shown.graphic.over?.(onCanvas(e));
+    canvas.style.cursor = pointer.active && (own || overGraphic(e)) ? 'pointer' : '';
   });
   addEventListener('pointerdown', (e) => {
     setPointer(e);
+    // A tap on one of the graphic's own targets (like a satellite) is the graphic's alone.
+    if (pointer.active && !morph && shown.graphic.tap?.(onCanvas(e))) return;
     if (pointer.active && overGraphic(e)) {
       if (!morph) shown.graphic.press?.();
       // Lets the page react (e.g. glide down to the CV) when the graphic is pressed in the hero.
@@ -968,7 +975,7 @@ export function current() {
 // text it should keep clear of starts ([data-voxel-clear]). For graphics that fit themselves to the
 // room around them.
 export function stage() {
-  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, recede, clearBelow: heroClear };
+  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear };
 }
 
 export function getStats() {

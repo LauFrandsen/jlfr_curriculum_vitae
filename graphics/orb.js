@@ -124,6 +124,8 @@ const NEVER = 1e9;
 const launches = [0, 1, 2].map((k) => LAUNCH.first + k * LAUNCH.stagger);   // when orbit k's rocket lifted off
 const lands = [NEVER, NEVER, NEVER];                                         // when its satellite began to come down
 const relaunches = [NEVER, NEVER, NEVER];                                    // when its next rocket lifts off
+const crashes = [0, 0, 0];                                                   // 1 while it's down from being shot
+const CRASH_HIT = 1.9;   // seconds (orbit time) for a shot-down satellite's middle to hit the orb
 const launchTime = (k) => launches[k];
 // How far (radians) satellite k has gone round its orbit s seconds after reaching it.
 const lapped = (k, s) => Math.abs(ORBITS[k].speed) * s + LAUNCH.boost * (1 - Math.exp(-s / LAUNCH.ease));
@@ -241,12 +243,14 @@ vec3 orbitNormal(float k) { return k < 0.5 ? ${g3(ORBITS[0].n)} : k < 1.5 ? ${g3
 // angle it reaches its orbit.
 uniform vec4 uLaunch;     // xyz = when orbit 0, 1, 2's rocket lifted off
 uniform vec4 uLand;       // xyz = when its satellite began to come down
+uniform vec4 uCrash;      // xyz = 1 if that satellite was shot down (it crashes rather than landing)
 const float ASCENT = ${LAUNCH.ascent.toFixed(2)};
 const float DEPLOY = ${LAUNCH.deploy.toFixed(2)};
 const float DESCENT = ${LAUNCH.descent.toFixed(2)};
 const float EXHAUST = ${LAUNCH.exhaust.toFixed(1)};
 float launchTime(float k) { return k < 0.5 ? uLaunch.x : k < 1.5 ? uLaunch.y : uLaunch.z; }
 float landTime(float k) { return k < 0.5 ? uLand.x : k < 1.5 ? uLand.y : uLand.z; }
+bool crashed(float k) { return (k < 0.5 ? uCrash.x : k < 1.5 ? uCrash.y : uCrash.z) > 0.5; }
 float launchAngle(float k) { return k < 0.5 ? ${ORBITS[0].launch.toFixed(4)} : k < 1.5 ? ${ORBITS[1].launch.toFixed(4)} : ${ORBITS[2].launch.toFixed(4)}; }
 vec3 launchSite(float k) { return k < 0.5 ? ${g3(ORBITS[0].site)} : k < 1.5 ? ${g3(ORBITS[1].site)} : ${g3(ORBITS[2].site)}; }
 // How far (radians) satellite k has gone round its orbit s seconds after reaching it: a fast first lap
@@ -267,6 +271,21 @@ vec3 climb(float k, float q, out vec3 dir) {
   float s = 1.0 - q;
   dir = normalize(3.0 * s * s * (p1 - p0) + 6.0 * s * q * (p2 - p1) + 3.0 * q * q * (p3 - p2) + vec3(1e-5));
   return s * s * s * p0 + 3.0 * s * s * q * p1 + 3.0 * s * q * q * p2 + q * q * q * p3;
+}
+// A piece of satellite k, shot down where it was at angle a (p0, in orbit), t seconds ago: flung
+// forward and apart out of the orbit, falling faster and faster onto the orb. seed (0..1) sets its own
+// way; spread 0 is the satellite's middle. Returns where it is; hit = when it reaches the surface and
+// at = where.
+vec3 debris(float k, float a, vec3 p0, float seed, float spread, float t, out float hit, out vec3 at) {
+  float sg = sign(orbitSpeed(k)), r = orbitRadius(k);
+  vec3 tangent = normalize(orbitAt(k, a + 0.01 * sg, 0.0) - orbitAt(k, a, 0.0));
+  vec3 apart = (vec3(seed, fract(seed * 7.3), fract(seed * 3.9)) - 0.5) * spread;
+  // Thrown outward and apart by the burst first, then curving back in, further along the orbit.
+  vec3 c = p0 + tangent * (0.5 + 0.3 * seed) * r + normalize(p0) * 0.3 + apart * 1.2;
+  at = normalize(p0 + tangent * 1.0 + apart * 1.2);
+  hit = ${CRASH_HIT.toFixed(2)} + 0.7 * fract(seed * 5.7) * spread;
+  float q = pow(clamp(t / hit, 0.0, 1.0), 1.25);
+  return mix(mix(p0, c, q), mix(c, at, q), q);
 }
 // Satellite k coming down at progress q (0 = leaving its orbit at angle a, 1 = touching down): forward
 // out of its orbit, curving over and down onto its pad. dir = its heading.
@@ -318,14 +337,24 @@ void main() {
 
   if (aSeed >= 8.0) {
     // Exhaust: a trail of squares behind a climbing rocket, a puff at the launch site first, spreading
-    // and thinning as it goes, and gone soon after the rocket reaches its orbit.
+    // and thinning as it goes, and gone soon after the rocket reaches its orbit. When its satellite is
+    // shot down, it's the smoke trailing the wreck down to the orb instead.
     float k = aPos.x, i = aPos.y, r = aSeed - 8.0;
     float tau = uNet.x - launchTime(k);
+    float down = uNet.x - landTime(k);
     float lag = 0.06 + i * 0.07;
     vec3 dir;
-    pos = climb(k, pow(clamp((tau - lag) / ASCENT, 0.0, 1.0), 1.6), dir)
-        + (vec3(r, fract(r * 7.1), fract(r * 3.3)) - 0.5) * (0.015 + 0.07 * i / EXHAUST);
-    fade = step(0.0, tau) * (1.0 - 0.6 * i / EXHAUST) * (1.0 - smoothstep(ASCENT * 0.8, ASCENT + 1.2, tau - lag));
+    vec3 puff = (vec3(r, fract(r * 7.1), fract(r * 3.3)) - 0.5) * (0.015 + 0.07 * i / EXHAUST);
+    if (down >= 0.0 && crashed(k)) {
+      float left = launchAngle(k) + sign(orbitSpeed(k)) * lapped(k, landTime(k) - launchTime(k) - ASCENT);
+      float hit;
+      vec3 at;
+      pos = debris(k, left, orbitAt(k, left, 0.0), 0.5, 0.0, max(down - lag, 0.0), hit, at) + puff;
+      fade = step(lag, down) * (1.0 - 0.6 * i / EXHAUST) * (1.0 - smoothstep(hit * 0.7, hit + 1.0, down - lag));
+    } else {
+      pos = climb(k, pow(clamp((tau - lag) / ASCENT, 0.0, 1.0), 1.6), dir) + puff;
+      fade = step(0.0, tau) * (1.0 - 0.6 * i / EXHAUST) * (1.0 - smoothstep(ASCENT * 0.8, ASCENT + 1.2, tau - lag));
+    }
     free = true;
     looseDim = 0.9 - 0.3 * i / EXHAUST;
   } else if (aSeed >= 7.0) {
@@ -366,7 +395,21 @@ void main() {
     float side = abs(aPos.z);
     float foldAlong = side < 1.0 ? aPos.y : -(side - 0.3) - (aPos.z < 0.0 ? 3.0 : 0.0);
     float foldOut = side < 1.0 ? aPos.z : 0.0;
-    if (down >= 0.0) {
+    if (down >= 0.0 && crashed(k)) {
+      // Shot down: it bursts with a flash, its squares tumbling out of the orbit as debris and
+      // falling onto the orb, each flaring where it hits before it sinks in.
+      float left = launchAngle(k) + sg * lapped(k, landTime(k) - launchTime(k) - ASCENT);
+      vec3 open = orbitAt(k, left + aPos.y * ${SATELLITE_STEP} / r, aPos.z * ${SATELLITE_STEP});
+      float hit;
+      vec3 at;
+      pos = debris(k, left, open, hash(aPos.y * 13.1 + aPos.z * 7.7 + k * 3.3), 1.0, down, hit, at);
+      heat = 2.4 * (1.0 - smoothstep(0.0, 0.55, down));
+      float landed = down - hit;
+      if (landed > 0.0) {
+        heat = slotHeat(landed) * 0.9;
+        fade = 1.0 - smoothstep(0.3, 1.6, landed);
+      }
+    } else if (down >= 0.0) {
       float left = launchAngle(k) + sg * lapped(k, landTime(k) - launchTime(k) - ASCENT);
       vec3 open = orbitAt(k, left + aPos.y * ${SATELLITE_STEP} / r, aPos.z * ${SATELLITE_STEP});
       vec3 dir;
@@ -909,6 +952,7 @@ function landings(t) {
     if (orbitTime >= relaunches[k]) {
       launches[k] = orbitTime;
       lands[k] = relaunches[k] = NEVER;
+      crashes[k] = 0;
     }
   }
   if (reducedMotion.matches || count === 0) return;
@@ -934,8 +978,53 @@ function orbitsUp(since) {
   for (let k = 0; k < 3; k++) {
     if (orbitTime < launches[k] + LAUNCH.laid || lands[k] !== NEVER) launches[k] = orbitTime - since;
     lands[k] = relaunches[k] = NEVER;
+    crashes[k] = 0;
   }
   nextLanding = NEVER;
+}
+
+// ---------- shooting a satellite down ----------
+
+// The satellite under a point on the canvas (device px), if one is in its orbit there and not hidden
+// behind the orb: the nearest within a fingertip.
+function satelliteAt({ x, y }) {
+  const st = stage(), cam = CONFIG.cameraDistance;
+  const ct = Math.cos(CONFIG.tilt), sn = Math.sin(CONFIG.tilt);
+  const reach = Math.max(24 * st.scale, 0.12 * st.radius);
+  let best = -1, nearest = reach;
+  for (let k = 0; k < Math.min(3, CONFIG.orbits); k++) {
+    const tau = orbitTime - launches[k];
+    if (tau < LAUNCH.ascent || lands[k] !== NEVER) continue;
+    const o = ORBITS[k];
+    const [px, y0, z0] = orbitAt(k, o.launch + o.sign * lapped(k, tau - LAUNCH.ascent), 0);
+    const py = y0 * ct - z0 * sn, pz = y0 * sn + z0 * ct;
+    if (pz < 0 && Math.hypot(px, py) < 1) continue;
+    const s = cam / (cam - pz);
+    const d = Math.hypot(x - (st.x + px * st.radius * s), y - (st.y - py * st.radius * s));
+    if (d < nearest) { nearest = d; best = k; }
+  }
+  return best;
+}
+
+// Shoots satellite k down now (t is the frame clock): it crashes onto the orb rather than landing, the
+// wreck rippling the surface where it hits, and is relaunched a while after, like a landing.
+function shootDown(k, t) {
+  const o = ORBITS[k];
+  lands[k] = orbitTime;
+  crashes[k] = 1;
+  relaunches[k] = orbitTime + CRASH_HIT + 1.8 + rand(CONFIG.relaunchMin, CONFIG.relaunchMax);
+  nextLanding = NEVER;
+  // Where the wreck comes down, as the shader has it (its middle piece), and two ripples beside it.
+  const angle = o.launch + o.sign * lapped(k, orbitTime - launches[k] - LAUNCH.ascent);
+  const p0 = orbitAt(k, angle, 0), ahead = orbitAt(k, angle + 0.01 * o.sign, 0);
+  const tangent = norm3([0, 1, 2].map((i) => ahead[i] - p0[i]));
+  const at = norm3([0, 1, 2].map((i) => p0[i] + tangent[i] * 1.0));
+  const side = norm3(cross3(at, tangent));
+  const speed = Math.max(CONFIG.orbitSpeed, 0.01);
+  scheduled.push({ dir: at, time: t + CRASH_HIT / speed });
+  for (const [k2, delay] of [[1, 0.25], [-1, 0.5]]) {
+    scheduled.push({ dir: norm3([0, 1, 2].map((i) => at[i] + side[i] * 0.15 * k2)), time: t + (CRASH_HIT + delay) / speed });
+  }
 }
 
 let breathPhase = 0;          // accumulated so changing breathSeconds never jumps
@@ -995,6 +1084,7 @@ function frame({ t, dt, set, activeCount }) {
   set('uArcB', arcB);
   set('uLaunch', [launches[0], launches[1], launches[2], 0]);
   set('uLand', [lands[0], lands[1], lands[2], 0]);
+  set('uCrash', [crashes[0], crashes[1], crashes[2], 0]);
 }
 
 // ---------- the graphic ----------
@@ -1019,6 +1109,14 @@ const orb = {
   look,
   // Morphed into, it arrives with its orbits up (the launch plays once per visit, as the page opens).
   settle: () => orbitsUp(LAUNCH.laid + 30),
+  // A satellite is a target of its own: tapping it shoots it down.
+  over: (at) => satelliteAt(at) >= 0,
+  tap: (at) => {
+    const k = satelliteAt(at);
+    if (k < 0) return false;
+    shootDown(k, lastT);
+    return true;
+  },
   press: gather,
   focus: (on) => { if (on) gather(); },
   // The paper's scorch behind the orb swells a little while it "speaks".
@@ -1080,8 +1178,16 @@ const orb = {
       for (let k = 0; k < 3; k++) {
         launches[k] = LAUNCH.first + k * LAUNCH.stagger;
         lands[k] = relaunches[k] = NEVER;
+        crashes[k] = 0;
       }
       nextLanding = NEVER;
+    },
+    // Shoots down a satellite on the front of its orbit, as tapping one does.
+    'Shoot one down': () => {
+      const up = [...Array(Math.min(3, CONFIG.orbits)).keys()]
+        .filter((k) => orbitTime - launches[k] > LAUNCH.ascent && lands[k] === NEVER);
+      const pick = up.filter(inFront).length ? up.filter(inFront) : up;
+      if (pick.length) shootDown(pick[Math.floor(Math.random() * pick.length)], lastT);
     },
     // Brings a satellite down now: one on the front of its orbit if there is one.
     'Land a satellite': () => {
