@@ -331,6 +331,7 @@ void main() {
   bool falling = false;
   bool free = false;         // out in space (orbits, satellites): doesn't turn or breathe with the orb
   float fall = 1.0;          // falling dots: 0 = at the start point, 1 = in its slot
+  float fallTimeShare = 1.0; // the same, as a plain share of its fall time (no gravity)
   vec2 fallStart = vec2(0.0);
   float wobbleAmt = 0.12;
   float fk = 0.0, fh1 = 0.0, fh2 = 0.0;
@@ -512,6 +513,7 @@ void main() {
       if (x < 1.0) {
         float u0 = (uGatherStart - cycleStart) / fallTime;
         fall = mix(fallCurve(u0, g, uLanding), 1.0, smoothstep(0.0, 1.0, x));
+        fallTimeShare = mix(u0, 1.0, smoothstep(0.0, 1.0, x));
         falling = true;
         fade = mix(smoothstep(0.0, 0.12, u0), 1.0, x) * mix(0.55, 1.0, fall);
       } else {
@@ -520,6 +522,7 @@ void main() {
     } else if (phase < fallEnd) {
       float u = phase / fallEnd;
       fall = fallCurve(u, g, uLanding);
+      fallTimeShare = u;
       falling = true;
       fade = smoothstep(0.0, 0.12, u) * mix(0.55, 1.0, fall);
     } else {
@@ -566,14 +569,30 @@ void main() {
 
   bool flowing = aSeed >= 2.0 && aSeed < 3.0;
   if (falling && flowing && uNet.z > 1.5) {
-    // Brought in by an orbit: it appears on one, rides along it, then drops down to its slot. Only
-    // while that orbit is up: laid, and its satellite not come down.
+    // Brought in by an orbit: in the last stretch of its fall time it appears on the orbit line a
+    // little before the point closest to its slot, rides along to it at about the orbit's own pace,
+    // and is let go there, dropping straight down onto its slot: carried a little forward at first,
+    // falling faster, then braking into place. Only while that orbit is up: laid, and its satellite
+    // not come down.
     float k = floor(fh1 * uNet.w);
     float laid = uNet.x - launchTime(k) - ASCENT;
     if (laid < 0.0 || lapped(k, laid) < 6.2832 || uNet.x >= landTime(k)) fade = 0.0;
-    float ride = 2.4 * sign(orbitSpeed(k)) * min(fall / 0.6, 1.0);
-    vec3 onRing = orbitAt(k, fh2 * 6.2832 + ride, 0.0);
-    pos = mix(onRing, pos, smoothstep(0.6, 1.0, fall));
+    float sg = sign(orbitSpeed(k)), r = orbitRadius(k);
+    vec3 slot = pos;
+    vec3 d = normalize(slot);
+    float letGo = atan(dot(d, normalize(orbitAt(k, 1.5708, 0.0))), dot(d, normalize(orbitAt(k, 0.0, 0.0))));
+    float w = fallTimeShare;
+    fade *= smoothstep(0.6, 0.66, w);
+    if (w < 0.8) {
+      pos = orbitAt(k, letGo - sg * 0.6 * (1.0 - clamp((w - 0.6) / 0.2, 0.0, 1.0)), 0.0);
+    } else {
+      float q = fallCurve((w - 0.8) / 0.2, 2.5, uLanding);
+      vec3 p0 = orbitAt(k, letGo, 0.0);
+      vec3 tangent = normalize(orbitAt(k, letGo + 0.01 * sg, 0.0) - p0);
+      vec3 p1 = p0 + tangent * 0.15 * r, p2 = slot * 1.12;
+      float s = 1.0 - q;
+      pos = s * s * s * p0 + 3.0 * s * s * q * p1 + 3.0 * s * q * q * p2 + q * q * q * slot;
+    }
     falling = false;
   }
 
