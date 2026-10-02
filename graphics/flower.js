@@ -6,7 +6,7 @@
 // flower then stays, mostly whole: now and then a petal (at most two) breaks apart and falls away on
 // the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
 
-import { STORY_DOTS, STORY_TOTAL, evenOrder, rebuild, reducedMotion, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -375,6 +375,10 @@ function makeFlower(shape) {
     const along = addv(scale(e1, Math.cos(phi)), scale(e2, Math.sin(phi)));
     const side = addv(scale(e1, -Math.sin(phi)), scale(e2, Math.cos(phi)));
     const length = shape.petalLength * (0.92 + Math.random() * 0.16), width = 0.075;
+    petalGeo[k] = {
+      base: sum(centre, scale(along, HEAD_RADIUS * 0.85)),
+      tip: sum(centre, scale(along, HEAD_RADIUS * 0.85 + length), scale(facing, 0.07)),
+    };
     for (let u = 0.03; u <= 1; u += 0.02 / length) {
       const w = width * Math.pow(Math.sin(Math.PI * Math.min(u * 1.06, 1)), 0.75) * (1 - 0.2 * u);
       const n = Math.max(1, Math.round((2 * w) / 0.02));
@@ -392,6 +396,7 @@ function makeFlower(shape) {
 
 const shape = newShape();
 let squares = null;   // made once per visit
+const petalGeo = [];  // per petal: its base and tip (stage units, before the wind), for tapping it
 
 // Story squares first (always drawn), then the soil and the flower, ordered evenly by where they sit,
 // so drawing only the first k squares on a slow device thins all of it evenly. Each square carries its
@@ -448,12 +453,15 @@ function firstPetals() {
 }
 firstPetals();
 
-// Breaks a whole petal, unless two are already missing. Its replacement sets off 5-10 s later, once
-// the broken one's squares have faded away.
+// Breaks a whole petal at random, unless two are already missing.
 function breakPetal() {
   const intact = petals.filter(whole);
   if (!intact.length || petals.length - intact.length >= 2) return;
-  const p = intact[Math.floor(Math.random() * intact.length)];
+  dropPetal(intact[Math.floor(Math.random() * intact.length)]);
+}
+
+// Breaks petal p off now. Its replacement sets off 5-10 s later, once its squares have faded away.
+function dropPetal(p) {
   p.fall = time;
   const gone = time + 0.15 + CONFIG.petalFallSeconds + 0.2;
   p.next = Math.max(gone, time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
@@ -469,9 +477,12 @@ function settle() {
 
 // ---------- frame ----------
 
-function frame({ dt, set }) {
+let lastT = 0;      // the frame clock at the last frame
+
+function frame({ t, dt, set }) {
   const still = reducedMotion.matches;   // with reduced motion: the flower in full bloom, still
   if (!still) time += dt;
+  lastT = t;
   for (const p of petals) {
     // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb the stem.
     if (time >= p.next) grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
@@ -502,29 +513,64 @@ function frame({ dt, set }) {
   set('uGust', gust);
 }
 
-// ---------- pose, for morphing ----------
+// ---------- where things are, as the shader draws them ----------
 
 const PART_INK = [0, 0.95, 1.2, 1.05, 1.15, 1, 1];   // by part, as in the shader (soil has its own)
 
-// Where the visible squares are at engine time t (see POSE in voxel.js): in place, as the shader
-// views them, with the wind as it will be then.
+// The wind's push at engine time t, as the shader has it.
+function windAt(t) {
+  const tt = t * CONFIG.swaySpeed;
+  const sway = (reducedMotion.matches ? 0 : CONFIG.sway) * (1 + 3 * gust);
+  return [(Math.sin(tt) + 0.4 * Math.sin(tt * 2.3 + 1.3)) * sway, 0.6 * Math.sin(tt * 0.7 + 2) * sway];
+}
+
+// A point of the flower (stage units) bent by the wind and seen from the viewing angle, as the shader
+// does it: returns x, y, z in view.
+function inView([x0, y0, z0], [dx, dz]) {
+  const c = Math.cos(CONFIG.pitch), s = Math.sin(CONFIG.pitch);
+  const h = Math.max(y0 - GROUND, 0) / shape.height;
+  const x = x0 + dx * h * h, z = z0 + dz * h * h, y = y0 - GROUND;
+  return [x, GROUND + y * c - z * s, y * s + z * c];
+}
+
+// Where the visible squares are at engine time t, for morphing (see POSE in voxel.js): in place, as
+// the shader views them, with the wind as it will be then.
 function pose(t) {
   const out = [];
-  const c = Math.cos(CONFIG.pitch), s = Math.sin(CONFIG.pitch);
-  const tt = t * CONFIG.swaySpeed;
-  const sway = CONFIG.sway * (1 + 3 * gust);
-  const dx = (Math.sin(tt) + 0.4 * Math.sin(tt * 2.3 + 1.3)) * sway, dz = 0.6 * Math.sin(tt * 0.7 + 2) * sway;
+  const wind = windAt(t);
   for (const [x0, y0, z0, land, letGo, part, info] of squares) {
     const visible = part === STORY ? storyLanded(Math.floor(info / STORY_DOTS))
       : part === PETAL ? time >= petals[info].start + land * petals[info].build && time < petals[info].fall + letGo
       : time >= land * CONFIG.growSeconds;
     if (!visible) continue;
-    const h = Math.max(y0 - GROUND, 0) / shape.height;
-    const x = x0 + dx * h * h, z = z0 + dz * h * h, y = y0 - GROUND;
-    const vz = y * s + z * c;
-    out.push(x, GROUND + y * c - z * s, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info : PART_INK[part], 1, 0);
+    const [x, y, vz] = inView([x0, y0, z0], wind);
+    out.push(x, y, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info : PART_INK[part], 1, 0);
   }
   return new Float32Array(out);
+}
+
+// ---------- tapping a petal off ----------
+
+// The whole petal under a point on the canvas (device px), if any: the nearest whose line from base
+// to tip passes within a fingertip of it.
+function petalAt({ x, y }) {
+  const st = stage(), cam = CONFIG.cameraDistance, wind = windAt(lastT);
+  const onScreen = (p) => {
+    const [vx, vy, vz] = inView(p, wind);
+    const s = cam / (cam - vz);
+    return [st.x + vx * st.radius * s, st.y - vy * st.radius * s];
+  };
+  const reach = Math.max(18 * st.scale, 0.05 * st.radius);
+  let best = -1, nearest = reach;
+  petals.forEach((p, k) => {
+    if (!whole(p) || !petalGeo[k]) return;
+    const [ax, ay] = onScreen(petalGeo[k].base), [bx, by] = onScreen(petalGeo[k].tip);
+    const lx = bx - ax, ly = by - ay;
+    const u = Math.min(1, Math.max(0, ((x - ax) * lx + (y - ay) * ly) / Math.max(lx * lx + ly * ly, 1)));
+    const d = Math.hypot(x - (ax + lx * u), y - (ay + ly * u));
+    if (d < nearest) { nearest = d; best = k; }
+  });
+  return best;
 }
 
 // ---------- the graphic ----------
@@ -539,6 +585,15 @@ export default {
   pose,
   settle,
   press: () => { gust = 1; },
+  // Each whole petal is a target of its own: tapping it breaks it off (no limit to how many; they
+  // all grow back).
+  over: (at) => petalAt(at) >= 0,
+  tap: (at) => {
+    const k = petalAt(at);
+    if (k < 0) return false;
+    dropPetal(petals[k]);
+    return true;
+  },
   halo: () => 0.35,
   sliders: [
     { group: 'Growing' },
