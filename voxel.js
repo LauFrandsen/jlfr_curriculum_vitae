@@ -23,8 +23,9 @@
 //               the ink, size and boost it passes to emit().
 //   Optional: settle() (put itself in its finished state before it's morphed into, e.g. fully grown),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
-//   pressDelay (seconds before the page glides to the CV after a press in the hero), and for the
-//   tune panel sliders and actions.
+//   pressDelay (seconds before the page glides to the CV after a press in the hero), over(at) and
+//   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
+//   there, tap handles a tap and returns true if it hit one), and for the tune panel sliders and actions.
 
 export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -563,8 +564,10 @@ export function setFocus(on) {
 const pointer = { x: 0, y: 0, tx: 0, ty: 0, active: false, strength: 0 };
 
 function setPointer(e) {
-  // Only pull when the pointer is over the canvas itself, not over text or controls.
-  if (e.target !== canvas) { pointer.active = false; return; }
+  // Only when the pointer is over open space, not over text or controls. The canvas sits behind the
+  // page (z-index -1), so over open space the browser reports the body (or the root), not the canvas.
+  const open = e.target === canvas || e.target === document.body || e.target === document.documentElement;
+  if (!open) { pointer.active = false; return; }
   pointer.tx = e.clientX;
   pointer.ty = e.clientY;
   if (!pointer.active && pointer.strength < 0.01) { pointer.x = pointer.tx; pointer.y = pointer.ty; }
@@ -575,13 +578,20 @@ function overGraphic(e) {
   return Math.hypot(e.clientX * dpr - cx, e.clientY * dpr - cy) < radius * 1.05;
 }
 
+// A pointer's place on the canvas, in device px, for a graphic's own targets (graphic.over / tap).
+const onCanvas = (e) => ({ x: e.clientX * dpr, y: e.clientY * dpr });
+
 function listen() {
   addEventListener('pointermove', (e) => {
     setPointer(e);
-    canvas.style.cursor = pointer.active && overGraphic(e) ? 'pointer' : '';
+    const own = pointer.active && !morph && shown.graphic.over?.(onCanvas(e));
+    // On the body, since that's what the pointer is over (see setPointer).
+    document.body.style.cursor = pointer.active && (own || overGraphic(e)) ? 'pointer' : '';
   });
   addEventListener('pointerdown', (e) => {
     setPointer(e);
+    // A tap on one of the graphic's own targets (like a satellite) is the graphic's alone.
+    if (pointer.active && !morph && shown.graphic.tap?.(onCanvas(e))) return;
     if (pointer.active && overGraphic(e)) {
       if (!morph) shown.graphic.press?.();
       // Lets the page react (e.g. glide down to the CV) when the graphic is pressed in the hero.
@@ -968,7 +978,7 @@ export function current() {
 // text it should keep clear of starts ([data-voxel-clear]). For graphics that fit themselves to the
 // room around them.
 export function stage() {
-  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, recede, clearBelow: heroClear };
+  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear };
 }
 
 export function getStats() {
