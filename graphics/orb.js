@@ -7,7 +7,7 @@
 // rings with satellites, antennas sending signals, a latitude/longitude grid that turns, and data arcs
 // drawing across the surface. LOOKS below has presets; the ?tune panel switches between them.
 
-import { STORY_DOTS, STORY_TOTAL, exact, rebuild, reducedMotion, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, exact, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -17,13 +17,13 @@ export const CONFIG = {
   burnColor: [0.13, 0.085, 0.05], // ink of the scorch around them: near-black with a trace of umber
   breathSeconds: 14,          // one full in-and-out breath
   breathDepth: 0.025,         // how much the orb grows at the top of a breath, fraction of radius
-  tilt: 0,                    // radians around the X axis: the viewing angle
+  tilt: 0.22,                 // radians around the X axis: the viewing angle
   cameraDistance: 6.4,        // in orb radii; lower = stronger perspective
   dotSize: 0.042,             // sprite size (square + burn) as a fraction of the orb radius
   squareSize: 0.18,           // the solid square, as a share of the sprite
   burn: 0.55,                 // strength of the scorch around each square
   brightness: 1,              // overall ink strength
-  arrival: 0,                 // how flowing dots arrive: 0 = swimming in from every side, 1 = along
+  arrival: 2,                 // how flowing dots arrive: 0 = swimming in from every side, 1 = along
                               //   traces from the sides, 2 = brought in by the orbits
   flowCount: 100,             // dots that come in from outside into their own slot in the orb
   flowSeconds: 60,            // average length of one cycle: come in, rest, drift out and fade
@@ -42,7 +42,7 @@ export const CONFIG = {
   rippleStrength: 0.004,      // how far a slotting-in square nudges the squares around it, fraction of radius (0 = off)
   rippleSpeed: 0.3,           // how fast the ripple spreads over the surface, orb radii per second
   rippleSeconds: 1.6,         // how long a ripple lasts before it has faded out
-  orbits: 0,                  // orbit rings around the orb, each with a satellite (0-3)
+  orbits: 3,                  // orbit rings around the orb, each with a satellite (0-3)
   orbitSpeed: 1,              // how fast things travel along the orbits
   antennas: 0,                // masts standing out from the surface, with signals running up them (0-12)
   antennaLength: 0.32,        // how far the longest mast reaches, fraction of radius
@@ -59,8 +59,8 @@ export const CONFIG = {
   burstSeconds: 4.5,          // average length of a speaking burst
   pauseSeconds: 3.2,          // average silence between bursts
   responsiveness: 8,          // how quickly the swell rises to each syllable (it fades at half this rate)
-  looseFraction: 0.3,         // extra loose dots outside the shell, as a share of dotCount
-  looseSpread: 0.36,          // how far out the outermost loose dots sit, fraction of radius
+  looseFraction: 0.06,        // extra loose dots outside the shell, as a share of dotCount
+  looseSpread: 0.2,           // how far out the outermost loose dots sit, fraction of radius
   looseDrift: 0.165,          // how much each loose dot wanders on its own
   looseVoice: 0.49,           // how far speech pushes the loose dots outward
   pullRadius: 0.2,            // pointer influence radius, fraction of orb radius
@@ -68,7 +68,7 @@ export const CONFIG = {
   pullGlow: 0.02,             // how much pulled dots darken and burn wider (0 = none)
 };
 
-// Presets for the orb's look, applied over CONFIG.
+// Presets for the orb's look, applied over CONFIG. Orbits is the default; Today is the look it had first.
 const LOOKS = {
   Today: { arrival: 0, flowCount: 100, orbits: 0, antennas: 0, gridLines: 0, spin: 0, arcs: 0, looseFraction: 0.3, looseSpread: 0.36, tilt: 0 },
   Circuit: { arrival: 1, flowCount: 100, orbits: 0, antennas: 0, gridLines: 0, spin: 0, arcs: 0, looseFraction: 0.06, looseSpread: 0.2, tilt: 0 },
@@ -103,10 +103,21 @@ const ORBITS = [
 });
 const g3 = (v) => `vec3(${v.map((x) => x.toFixed(5)).join(', ')})`;
 const SATELLITE_STEP = 0.017;   // spacing of a satellite's squares (orb radii)
+const WIDEST = ORBITS[ORBITS.length - 1].radius;
 
-// Orbit k's ring at angle a, dr further out than its radius, as the shader has it.
+// How far out the orbits reach, from 1 (as set) down to tucked in close: they're drawn in toward the
+// orb so the widest stays on the screen, as when the orb is wide on a phone.
+let orbitFit = 1;
+function fitOrbits() {
+  const { x, radius, width } = stage();
+  const room = Math.min(x, width - x) / Math.max(radius, 1);
+  orbitFit = Math.min(1, Math.max(0.2, (room * 0.96 - 1) / (WIDEST - 1)));
+}
+const fitted = (k) => 1 + (ORBITS[k].radius - 1) * orbitFit;
+
+// Orbit k's ring at angle a, dr further out than its (fitted) radius, as the shader has it.
 function orbitAt(k, a, dr) {
-  const o = ORBITS[k], r = o.radius + dr;
+  const o = ORBITS[k], r = fitted(k) + dr;
   return [0, 1, 2].map((i) => (Math.cos(a) * o.u[i] + Math.sin(a) * o.v[i]) * r);
 }
 
@@ -133,16 +144,20 @@ uniform vec4 uRipple[${RIPPLES}];   // recent slot-ins: xyz = where (unit vector
 uniform float uRippleStrength, uRippleSpeed, uRippleSeconds;
 uniform vec4 uNet;        // x = orbit time, y = the orb's turn (radians), z = how flowing dots arrive
                           // (0 = swimming in, 1 = along traces from the sides, 2 = by orbit), w = orbits
-uniform vec4 uNet2;       // x = longest antenna, y = arc lift, z = seconds to draw an arc, w = seconds it holds
+uniform vec4 uNet2;       // x = longest antenna, y = arc lift, z = seconds to draw an arc, w = how far
+                          // out the orbits reach (1 = as set, less to fit the screen)
 uniform vec4 uArcA[${ARCS}];   // per arc: xyz = where it starts (unit vector, turning with the orb), w = when
 uniform vec4 uArcB[${ARCS}];   // xyz = where it ends
 
-// Orbit k's ring (k = 0, 1, 2) at angle a, dr further out than its radius; its radius and speed.
+// Orbit k's ring (k = 0, 1, 2): its radius (fitted to the screen), the point at angle a and dr
+// further out, and its speed.
+float orbitRadius(float k) {
+  return 1.0 + ((k < 0.5 ? ${ORBITS[0].radius.toFixed(3)} : k < 1.5 ? ${ORBITS[1].radius.toFixed(3)} : ${ORBITS[2].radius.toFixed(3)}) - 1.0) * uNet2.w;
+}
 vec3 orbitAt(float k, float a, float dr) {
-${ORBITS.map((o, k) => `  if (k < ${k}.5) return (cos(a) * ${g3(o.u)} + sin(a) * ${g3(o.v)}) * (${o.radius.toFixed(3)} + dr);`).join('\n')}
+${ORBITS.map((o, k) => `  if (k < ${k}.5) return (cos(a) * ${g3(o.u)} + sin(a) * ${g3(o.v)}) * (orbitRadius(k) + dr);`).join('\n')}
   return vec3(0.0);
 }
-float orbitRadius(float k) { return k < 0.5 ? ${ORBITS[0].radius.toFixed(3)} : k < 1.5 ? ${ORBITS[1].radius.toFixed(3)} : ${ORBITS[2].radius.toFixed(3)}; }
 float orbitSpeed(float k) { return k < 0.5 ? ${ORBITS[0].speed.toFixed(3)} : k < 1.5 ? ${ORBITS[1].speed.toFixed(3)} : ${ORBITS[2].speed.toFixed(3)}; }
 
 // Ripples on the surface around recent slot-ins, at unit direction d: a single crest and trough
@@ -194,7 +209,7 @@ void main() {
     float along = aPos.x;
     float age = uTime - a.w;
     float head = clamp(age / uNet2.z, 0.0, 1.0);
-    float tail = clamp((age - uNet2.z - uNet2.w) / uNet2.z, 0.0, 1.0);
+    float tail = clamp((age - uNet2.z - ${ARC_HOLD.toFixed(2)}) / uNet2.z, 0.0, 1.0);
     float span = acos(clamp(dot(a.xyz, b.xyz), -1.0, 1.0));
     pos = normalize(mix(a.xyz, b.xyz, along) + vec3(1e-4)) * (1.01 + uNet2.y * span * sin(3.14159 * along));
     if (age < 0.0 || along > head || along < tail) fade = 0.0;
@@ -470,18 +485,15 @@ function build() {
     const slot = grid ? grid[Math.floor(Math.random() * grid.length)] : randomDirection();
     dots.push([...slot, 2 + Math.random()]);
   }
-  // Shuffle so drawing only the first k dots (on slow devices) still covers the sphere evenly.
-  for (let i = dots.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    [dots[i], dots[j]] = [dots[j], dots[i]];
-  }
+  // Evenly ordered, so drawing only the first k dots (on slow devices) still covers the sphere evenly.
+  const ordered = evenOrder(dots, (d) => d);
   const story = [];
   for (let i = 0; i < STORY_TOTAL; i++) {
     let d;
     do d = randomDirection(); while (d[2] < 0.3);
     story.push([...d, 3 + (i + 0.5) / STORY_TOTAL]);
   }
-  const all = story.concat(decorations(), dots);
+  const all = story.concat(decorations(), ordered);
   const data = new Float32Array(all.length * 4);
   all.forEach((d, k) => data.set(d, k * 4));
 
@@ -504,6 +516,7 @@ function build() {
 // and the data arcs, which come and go).
 function pose(t) {
   const out = [];
+  fitOrbits();
   const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt);
   const turn = spinAngle + (t - lastT) * CONFIG.spin;
   const travelled = orbitTime + (t - lastT) * CONFIG.orbitSpeed;
@@ -516,7 +529,7 @@ function pose(t) {
       p = spun(at.map((x) => x * breath), turn);
     } else if (seed >= 5) {
       const k = at[0], o = ORBITS[k];
-      p = orbitAt(k, (seed - 5) * TAU + o.speed * travelled + (at[1] * SATELLITE_STEP) / o.radius, at[2] * SATELLITE_STEP);
+      p = orbitAt(k, (seed - 5) * TAU + o.speed * travelled + (at[1] * SATELLITE_STEP) / fitted(k), at[2] * SATELLITE_STEP);
       inSpace = true;
     } else if (seed >= 4) {
       p = orbitAt(at[0], (seed - 4) * TAU, 0);
@@ -730,22 +743,23 @@ function frame({ t, dt, set, activeCount }) {
   set('uRippleSpeed', CONFIG.rippleSpeed);
   set('uRippleSeconds', Math.max(0.1, CONFIG.rippleSeconds));
   set('uNet', [orbitTime, spinAngle, arrival, Math.min(3, CONFIG.orbits)]);
-  set('uNet2', [CONFIG.antennaLength, CONFIG.arcLift, Math.max(0.2, CONFIG.arcSeconds), ARC_HOLD]);
+  fitOrbits();
+  set('uNet2', [CONFIG.antennaLength, CONFIG.arcLift, Math.max(0.2, CONFIG.arcSeconds), orbitFit]);
   set('uArcA', arcA);
   set('uArcB', arcB);
 }
 
 // ---------- the graphic ----------
 
-const rebuildNow = () => rebuild();
+const rebuildNow = () => rebuild({ graphic: orb });
 
-// Puts on one of the LOOKS.
+// Puts on one of the LOOKS (also while another graphic is shown: the orb then arrives in it).
 function look(name) {
   Object.assign(CONFIG, LOOKS[name]);
-  rebuild();
+  rebuild({ graphic: orb });
 }
 
-export default {
+const orb = {
   name: 'orb',
   CONFIG,
   attributes: [['aPos', 3], ['aSeed', 1]],
@@ -812,3 +826,5 @@ export default {
     ...Object.fromEntries(Object.keys(LOOKS).map((name) => [`Look: ${name}`, () => look(name)])),
   },
 };
+
+export default orb;

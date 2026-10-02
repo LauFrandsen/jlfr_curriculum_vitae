@@ -6,16 +6,16 @@
 // flower then stays, mostly whole: now and then a petal (at most two) breaks apart and falls away on
 // the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
 
-import { STORY_DOTS, STORY_TOTAL, rebuild, reducedMotion, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, rebuild, reducedMotion, storyLanded } from '../voxel.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
-  growSeconds: 45,            // from the first soil to the first petals starting (the growth, once per visit)
+  growSeconds: 22.5,          // from the first soil to the first petals starting (the growth, once per visit)
   flightSeconds: 4,           // how long a square takes to come in to its place, on average
   gravity: 3,                 // 0 = constant speed; higher = slower start, faster climb at the end
   landing: 0.35,              // share of the flight spent braking into place (0 = arrive at full speed)
-  petalGrowSeconds: 13,       // how long the first petals take to build, all together
-  petalRegrowSeconds: 7,      // how long a single new petal takes to build
+  petalGrowSeconds: 6.5,      // how long the first petals take to build, all together
+  petalRegrowSeconds: 3.5,    // how long a single new petal takes to build
   breakPauseMin: 15,          // once the flower is whole, a petal breaks apart after a random pause between these
   breakPauseMax: 40,
   secondBreakChance: 0.2,     // chance that a second petal breaks just after the first (never more than two)
@@ -393,19 +393,14 @@ function makeFlower(shape) {
 const shape = newShape();
 let squares = null;   // made once per visit
 
-// Story squares first (always drawn), then the soil and the flower shuffled together, so drawing
-// only the first k squares on a slow device still shows all of it. Each square carries its own times
-// in flower seconds: when it lands and when it lets go (never, but for petals), from the growth and
-// each petal's schedule as they are now; frame() rebuilds when a petal breaks or regrows.
+// Story squares first (always drawn), then the soil and the flower, ordered evenly by where they sit,
+// so drawing only the first k squares on a slow device thins all of it evenly. Each square carries its
+// own times in flower seconds: when it lands and when it lets go (never, but for petals), from the
+// growth and each petal's schedule as they are now; frame() rebuilds when a petal breaks or regrows.
 function build() {
   if (!squares) {
     const soil = makeSoil();
-    const rest = soil.squares.concat(makeFlower(shape));
-    for (let i = rest.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      [rest[i], rest[j]] = [rest[j], rest[i]];
-    }
-    squares = soil.story.concat(rest);
+    squares = soil.story.concat(evenOrder(soil.squares.concat(makeFlower(shape)), (s) => s));
   }
   const data = new Float32Array(squares.length * 8);
   squares.forEach(([x, y, z, land, letGo, part, info, r], k) => {
