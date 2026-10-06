@@ -4,7 +4,8 @@
 // and climbs the stem to its place. Once per visit the soil forms, the roots spread, the stem pokes
 // through the ground, leaves unfold, the head fills in as a sunflower spiral and petals grow. The
 // flower then stays, mostly whole: now and then a petal (at most two) breaks apart and falls away on
-// the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
+// the wind, and a few seconds later new squares climb the stem to grow a new one. High above it,
+// satellites cross the sky, laying their orbits' dotted lines as the orb's do. Drawn by voxel.js.
 
 import { STORY_DOTS, STORY_TOTAL, evenOrder, panOf, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
 import { play } from '../sound.js';
@@ -65,7 +66,80 @@ const HEAD_RADIUS = 0.09;
 const HEAD_SQUARES = 110;
 
 // Parts, as the shader knows them.
-const SOIL = 0, ROOT = 1, STEM = 2, LEAF = 3, HEAD = 4, PETAL = 5, STORY = 6;
+const SOIL = 0, ROOT = 1, STEM = 2, LEAF = 3, HEAD = 4, PETAL = 5, STORY = 6, SKY_LINE = 7, SATELLITE = 8;
+
+const TAU = Math.PI * 2;
+const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+const addv = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const scale = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const norm = (a) => scale(a, 1 / Math.hypot(a[0], a[1], a[2]));
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+const sum = (...terms) => terms.reduce(addv);
+const rand = (a, b) => a + Math.random() * (b - a);
+
+// ---------- the sky ----------
+
+// High above the flower, satellites cross the sky on wide orbits around a planet out of sight below
+// (its ground is the planet's surface), so only their tops show, as arcs crossing each other over the
+// flower. Each lays its orbit's dotted line as it first crosses, like the orb's satellites on their
+// first lap, and the line warms again each time it comes by; then it goes on round the far side and
+// comes back across a while later. Per orbit: where its top is (stage units, before the view looks
+// down), its radius, its plane's normal, the satellite's speed (stage units a second), the way it
+// crosses (1: right to left, -1: left to right) and when it first does (flower seconds).
+const SKY_REACH = 5.2;   // the lines reach this far each side of the flower (stage units)
+const SKY_PAUSE = 12;    // seconds round the far side between one crossing and the next
+const SKY_STEP = 0.055;  // spacing of a line's squares (stage units)
+const SATELLITE_STEP = 0.02;   // spacing of a satellite's squares
+const SKY = [
+  { top: [0.3, 0.86, -0.9], radius: 10, normal: [0.05, 0.3, 1], speed: 0.34, dir: 1, first: 1.5 },
+  { top: [-0.7, 0.92, -1.5], radius: 13, normal: [-0.09, 0.42, 1], speed: 0.28, dir: -1, first: 6 },
+  { top: [1.1, 0.92, -0.3], radius: 8.5, normal: [0.15, 0.14, 1], speed: 0.4, dir: 1, first: 11 },
+].map((o) => {
+  // In its plane: u up to its top, v across (toward -x); angle 0 is the top.
+  const n = norm(o.normal), u = norm(addv([0, 1, 0], scale(n, -n[1]))), v = cross(n, u);
+  const span = Math.asin(Math.min(1, SKY_REACH / o.radius)), w = o.speed / o.radius;
+  return { ...o, u, v, centre: addv(o.top, scale(u, -o.radius)), span, w, period: (2 * span) / w + SKY_PAUSE };
+});
+
+// Where angle a is on orbit k, dr further out (stage units). The shader's skyAt is the same.
+const skyAt = (k, a, dr = 0) => {
+  const o = SKY[k], r = o.radius + dr;
+  return sum(o.centre, scale(o.u, r * Math.cos(a)), scale(o.v, r * Math.sin(a)));
+};
+// Satellite k's angle at flower time t, or null while it's round the far side (or not yet up).
+function skyAngle(k, t) {
+  const o = SKY[k];
+  if (t < o.first) return null;
+  const m = (t - o.first) % o.period;
+  return o.w * m > 2 * o.span ? null : o.dir * (o.w * m - o.span);
+}
+// When satellite k first passes angle a (flower seconds).
+const skyPassed = (k, a) => SKY[k].first + (SKY[k].dir * a + SKY[k].span) / SKY[k].w;
+
+// The same in GLSL, for the shader: a constant per orbit, picked by k.
+const g3 = (a) => `vec3(${a.map((x) => x.toFixed(5)).join(', ')})`;
+const f1 = (x) => x.toFixed(5);
+const pick = (each) => SKY.map((o, k) => (k < SKY.length - 1 ? `k < ${k}.5 ? ${each(o)} : ` : each(o))).join('');
+const SKY_GLSL = `
+// The sky (SKY in flower.js; keep them in step): where angle a is on orbit k, dr further out; its
+// radius and how long a crossing and the time round the far side take; and satellite k's angle at
+// flower time t, shown 1 while it's crossing.
+vec3 skyAt(float k, float a, float dr) {
+  vec3 c = ${pick((o) => g3(o.centre))};
+  vec3 u = ${pick((o) => g3(o.u))};
+  vec3 v = ${pick((o) => g3(o.v))};
+  return c + (skyRadius(k) + dr) * (cos(a) * u + sin(a) * v);
+}
+float skyPeriod(float k) { return ${pick((o) => f1(o.period))}; }
+float skyAngle(float k, float t, out float shown) {
+  vec4 o = ${pick((o) => `vec4(${[o.span, o.w, o.first, o.dir].map(f1).join(', ')})`)};
+  float m = mod(max(t - o.z, 0.0), skyPeriod(k));
+  shown = t < o.z || o.y * m > 2.0 * o.x ? 0.0 : 1.0;
+  return o.w * (o.y * m - o.x);
+}`;
+const SKY_RADIUS_GLSL = `float skyRadius(float k) { return ${pick((o) => f1(o.radius))}; }`;
 
 const SHADER = `
 attribute vec3 aTarget;   // where the square sits once grown (stage units)
@@ -82,6 +156,8 @@ uniform vec2 uGround;     // how far the ground is seen to the left and to the r
 const float GROUND = ${GROUND.toFixed(3)};
 const float FOOT = ${FOOT.toFixed(3)};
 const float SCREEN_SHARE = 0.45;   // share of the way spent on screen, before entering the soil
+${SKY_RADIUS_GLSL}
+${SKY_GLSL}
 
 // The stem's centreline at height h (0 = the ground, 1 = the head; below 0 it's in the soil).
 // flower.js has the same function; keep them in step.
@@ -108,6 +184,12 @@ vec3 view(vec3 p) {
 // How strongly the ground shows at x: full near the flower, fading out to how far it's seen that side.
 float groundFade(float x) {
   return 1.0 - smoothstep(0.6, x < 0.0 ? uGround.x : uGround.y, abs(x));
+}
+
+// The sky fades out as far as the ground does, but holds on further first.
+float skyFade(float x) {
+  float reach = x < 0.0 ? uGround.x : uGround.y;
+  return 1.0 - smoothstep(0.5 * reach, reach, abs(x));
 }
 
 // Which side of the screen a square comes in from (-1 left, 1 right): either, with the flower in the
@@ -173,8 +255,25 @@ void main() {
   vec2 start = vec2(0.0);
   float screenMix = 1.0;     // below 1: on screen, between start and its place
   bool clip = true;
+  bool sky = part > 6.5;
 
-  if (part > 5.5) {
+  if (sky) {
+    // The sky: an orbit's dotted line, fainter than what travels on it, each square laid as its
+    // satellite first passes (dark at first, cooling behind it) and warming each time it comes by
+    // again; or the satellite itself, a small body with a panel to either side, crossing. Both fade
+    // out to the sides (skyFade). The wind doesn't reach up here.
+    float k = aInfo.y, t = uGrow;
+    if (part < 7.5) {
+      float since = t - aTime.x;
+      fade = smoothstep(0.0, 0.15, since);
+      heat = since < 0.0 ? 0.0 : exp(-mod(since, skyPeriod(k)) / 1.3) * 1.1;
+      ink = 0.5;
+    } else {
+      float a = skyAngle(k, t, fade);
+      pos = skyAt(k, a + aTarget.x * ${SATELLITE_STEP.toFixed(4)} / skyRadius(k), aTarget.y * ${SATELLITE_STEP.toFixed(4)});
+    }
+    fade *= skyFade(pos.x);
+  } else if (part > 5.5) {
     // A CV entry's square: falls from the entry's marker onto the soil at the flower's foot.
     float fall;
     if (story(aInfo.y, fall, start, heat, fade)) screenMix = fall;
@@ -222,10 +321,10 @@ void main() {
     ink *= part < 0.5 ? aInfo.y * groundFade(aTarget.x) : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
   }
 
-  vec3 p = view(sway(pos));
+  vec3 p = view(sky ? pos : sway(pos));
   float s;
   vec2 screen = project(p, s);
-  float depth = clamp(0.55 + p.z * 0.9, 0.0, 1.0);
+  float depth = sky ? (part < 7.5 ? 0.5 : 0.7) : clamp(0.55 + p.z * 0.9, 0.0, 1.0);
   if (screenMix < 1.0) {
     screen = mix(start, screen, screenMix);
     s = mix(1.0, s, screenMix);
@@ -235,17 +334,6 @@ void main() {
 }`;
 
 // ---------- shapes ----------
-
-const TAU = Math.PI * 2;
-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
-const addv = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const scale = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
-const norm = (a) => scale(a, 1 / Math.hypot(a[0], a[1], a[2]));
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const lerp = (a, b, t) => a + (b - a) * t;
-const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
-const sum = (...terms) => terms.reduce(addv);
-const rand = (a, b) => a + Math.random() * (b - a);
 
 // This visit's flower.
 function newShape() {
@@ -416,25 +504,42 @@ function makeFlower(shape) {
   return out;
 }
 
+// The sky's squares: each orbit's dotted line (land: when its satellite first passes there, in
+// seconds), and its satellite: a 2x2 body with a panel of three squares to either side, out from
+// its orbit, as the orb's are (x, y: its place along and out, in SATELLITE_STEPs).
+function makeSky() {
+  const out = [];
+  SKY.forEach((o, k) => {
+    const n = Math.round((2 * o.span * o.radius) / SKY_STEP);
+    for (let j = 0; j < n; j++) {
+      const a = -o.span + (2 * o.span * (j + 0.5)) / n;
+      out.push(square(skyAt(k, a), skyPassed(k, a), 0, SKY_LINE, k));
+    }
+    for (const [along, outward] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5],
+      [0, -1.8], [0, -2.8], [0, -3.8], [0, 1.8], [0, 2.8], [0, 3.8]]) out.push(square([along, outward, 0], 0, 0, SATELLITE, k));
+  });
+  return out;
+}
+
 // ---------- the squares ----------
 
 const shape = newShape();
 let squares = null;   // made once per visit
 const petalGeo = [];  // per petal: its base and tip (stage units, before the wind), for tapping it
 
-// Story squares first (always drawn), then the soil and the flower, ordered evenly by where they sit,
-// so drawing only the first k squares on a slow device thins all of it evenly. Each square carries its
+// Story squares and the sky's first (always drawn), then the soil and the flower, ordered evenly by
+// where they sit, so drawing only the first k squares on a slow device thins all of it evenly. Each square carries its
 // own times in flower seconds: when it lands and when it lets go (never, but for petals), from the
 // growth and each petal's schedule as they are now; frame() rebuilds when a petal breaks or regrows.
 function build() {
   if (!squares) {
     const soil = makeSoil();
-    squares = soil.story.concat(evenOrder(soil.squares.concat(makeFlower(shape)), (s) => s));
+    squares = soil.story.concat(makeSky(), evenOrder(soil.squares.concat(makeFlower(shape)), (s) => s));
     indexLandings();
   }
   const data = new Float32Array(squares.length * 8);
   squares.forEach(([x, y, z, land, letGo, part, info, r], k) => {
-    let times = [land * CONFIG.growSeconds, NEVER];
+    let times = [part >= SKY_LINE ? land : land * CONFIG.growSeconds, NEVER];
     if (part === PETAL) {
       const p = petals[info];
       times = [p.start + land * p.build, p.fall === NEVER ? NEVER : p.fall + letGo];
@@ -516,7 +621,7 @@ function indexLandings() {
   landingsByPart = new Map();
   landingsByPetal = [];
   for (const [x, , , land, , part, info] of squares) {
-    if (part === STORY) continue;
+    if (part === STORY || part >= SKY_LINE) continue;
     if (part === PETAL) (landingsByPetal[info] ??= []).push([land, x, info]);
     else {
       if (!landingsByPart.has(part)) landingsByPart.set(part, []);
@@ -652,8 +757,9 @@ function reachGround() {
   groundReach[1] = open(st.width - st.x, 1 - left);
 }
 const groundFade = (x) => 1 - smooth(0.6, groundReach[x < 0 ? 0 : 1], Math.abs(x));
+const skyFade = (x) => { const reach = groundReach[x < 0 ? 0 : 1]; return 1 - smooth(0.5 * reach, reach, Math.abs(x)); };
 
-const PART_INK = [0, 0.95, 1.2, 1.05, 1.15, 1, 1];   // by part, as in the shader (soil has its own)
+const PART_INK = [0, 0.95, 1.2, 1.05, 1.15, 1, 1, 0.5, 1];   // by part, as in the shader (soil has its own)
 
 // The wind's push at engine time t, as the shader has it.
 function windAt(t) {
@@ -678,6 +784,14 @@ function pose(t) {
   const wind = windAt(t);
   reachGround();
   for (const [x0, y0, z0, land, letGo, part, info] of squares) {
+    if (part >= SKY_LINE) {   // the sky: the lines laid so far and the satellites crossing, out of the wind
+      const a = part === SATELLITE ? skyAngle(info, time) : 0;
+      if (part === SKY_LINE ? time < land : a === null) continue;
+      const at = part === SKY_LINE ? [x0, y0, z0] : skyAt(info, a + (x0 * SATELLITE_STEP) / SKY[info].radius, y0 * SATELLITE_STEP);
+      const [x, y, vz] = inView(at, [0, 0]);
+      out.push(x, y, vz, part === SKY_LINE ? 0.5 : 0.7, PART_INK[part] * skyFade(at[0]), 1, 0);
+      continue;
+    }
     const visible = part === STORY ? storyLanded(Math.floor(info / STORY_DOTS))
       : part === PETAL ? time >= petals[info].start + land * petals[info].build && time < petals[info].fall + letGo
       : time >= land * CONFIG.growSeconds && (part !== SOIL || groundFade(x0) > 0.02);
@@ -706,7 +820,7 @@ function markAt(i, t) {
   const sq = squares?.[i];
   if (!sq) return null;
   const [x0, y0, z0, , , part, info] = sq;
-  if (part === SOIL || part === ROOT || part === STORY || (part === PETAL && !whole(petals[info]))) return null;
+  if (part === SOIL || part === ROOT || part === STORY || part >= SKY_LINE || (part === PETAL && !whole(petals[info]))) return null;
   const [x, y, z] = inView([x0, y0, z0], windAt(t));
   return [x, y, z, Math.min(1, Math.max(0, 0.55 + z * 0.9)), 1];
 }
