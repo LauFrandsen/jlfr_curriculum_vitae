@@ -1,6 +1,6 @@
 # laufrandsen.dk
 
-Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) on cream paper, with a WebGL graphic made of small ink squares, each with a soft burn around it. Each visit starts on one of the graphics at random, the orb or the flower, and every 3 minutes the squares rearrange themselves into the next one.
+Jonas Biune Frandsen's CV: a static page (plain HTML, CSS and JavaScript, no build step) on cream paper, with a WebGL graphic made of small ink squares, each with a soft burn around it. Each visit starts on one of the graphics at random, the orb or the flower, and every 3 minutes the squares rearrange themselves into the next one. A speaker button in the corner turns on sound: effects for everything the graphics do, over slow, somber background music, all of it synthesized live in the browser (no audio files).
 
 ## Run locally
 
@@ -15,10 +15,11 @@ Then open http://localhost:8080. Add `?graphic=orb` or `?graphic=flower` to star
 - `index.html`: all CV content. Each experience/project entry with `data-drop` sends squares into the graphic when it scrolls into view: in ink, or in the entry's `--dot` colour if one is set (e.g. `style="--dot: #8a3b1e"`).
 - `style.css`: colour tokens (paper, ink, burn) at the top, layout, phone breakpoints and the print/PDF version. `.voxel-rest` sets where the graphic rests once scrolled: beside the text from 1100px, and below that on the bottom edge as a "horizon", with the text fading into the paper (`.paper-fade`) just above it. `html[data-graphic="…"]` rules place a graphic its own way.
 - `voxel.js`: the engine every graphic shares (WebGL). It draws the squares and their burn, glides the graphic with the page (hero, rest, horizon, beside a project pane), drops the CV entries' squares in, handles the pointer, presses and adaptive quality, and morphs from one graphic into the next.
-- `graphics/orb.js`: the orb. A breathing shell of squares with three orbits around it: as the page opens, rockets lift off from it, unfold into satellites and lay the orbits' dotted lines on a fast first lap. Now and then a satellite comes back down onto its pad, its orbit dissolving, and a new rocket relaunches it. Tapping a satellite shoots it down: it bursts and crashes onto the orb instead. New squares arrive by orbit and ripple the surface where they land. Other looks (`LOOKS`, buttons in the `?tune` panel) trade the orbits for traces, a turning grid with data arcs, or antennas.
-- `graphics/flower.js`: the flower. It grows once out of a strip of soil, every square coming in from the side of the screen, through the soil and up the stem. It then stays mostly whole: now and then a petal (at most two) breaks away and a new one grows back. Tapping a petal breaks it off too.
-- `page.js`: picks the first graphic and the rotation (`GRAPHICS`, `ROTATE_SECONDS`); section reveals, entry squares, project panes, PDF button.
-- `tune.js`: the `?tune` panel, with each graphic's own sliders and buttons plus shared ones.
+- `graphics/orb.js`: the orb. A breathing shell of squares with three orbits around it. As the page opens, its squares blip in one by one, packed into a small core, and the core then opens out into the orb (the intro; `?tune` has "Play intro"); then rockets lift off from it, unfold into satellites and lay the orbits' dotted lines on a fast first lap. Now and then a satellite comes back down onto its pad, its orbit dissolving, and a new rocket relaunches it. Tapping a satellite shoots it down: it bursts and crashes onto the orb instead. New squares arrive by orbit and ripple the surface where they land. Other looks (`LOOKS`, buttons in the `?tune` panel) trade the orbits for traces, a turning grid with data arcs, or antennas.
+- `graphics/flower.js`: the flower. It grows once out of the ground, every square coming in from the side of the screen, through the soil and up the stem. The ground is full near the flower and thins and fades out to a little past the screen's edges (`groundReach`), so it seems to carry on; beside the CV it stops short on the text's side. It then stays mostly whole: now and then a petal (at most two) breaks away and a new one grows back. Tapping a petal breaks it off too.
+- `sound.js`: all sound, made with the Web Audio API. `SOUNDS` holds the effects (deep, short, in A minor), which the graphics, the engine and `page.js` play by name with `play()` as things happen: the orb's intro, rockets, satellites landing or shot down, squares slotting in, the flower's growth part by part, petals breaking and regrowing, the morph, CV entries' squares, project panes. "The music" section makes the background music as it plays: a low drone with a dark wind, slow pad chords in A minor and the odd bell, in a long reverb. Off until the speaker button (`#sound-button`) turns it on; the choice is kept in `localStorage`, and browsers only start audio after a tap, click or key press. `SOUND` holds the overall, music and room levels. Effects get quieter once the graphic has glided aside; the music doesn't.
+- `page.js`: picks the first graphic and the rotation (`GRAPHICS`, `ROTATE_SECONDS`); section reveals, entry squares, project panes, PDF button, sound button.
+- `tune.js`: the `?tune` panel, with each graphic's own sliders and buttons plus shared ones, and a Sound section: the levels, and every effect to play on its own.
 
 ## Adding a graphic
 
@@ -47,10 +48,18 @@ Research: look at how sites with large hero visuals, 3D scenes or canvas animati
 
 ## Publishing
 
-`gh-pages` is the live branch (custom domain in `CNAME`). GitHub Pages builds it with its standard Jekyll build, which copies the site as-is (`_config.yml` only keeps the notes unpublished). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready:
+`gh-pages` is the live branch (custom domain in `CNAME`). GitHub Pages builds it with its standard Jekyll build, which copies the site as-is (`_config.yml` only keeps the notes and `tools/` unpublished). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready.
+
+Before publishing, set the site's version: `index.html` loads every file under a version code (`?v=…`, through an import map for the scripts), so visitors' browsers never mix cached files from the last publish with new ones. GitHub Pages lets browsers keep each file for 10 minutes, and a mix can break the page. The script sets the code from the files' contents; commit the change, then publish:
+
+```bash
+node tools/version.mjs
+```
 
 ```bash
 git switch gh-pages && git merge light && git push && git switch light
 ```
+
+A new graphic needs an entry in the import map in `index.html`; the script warns if one is missing.
 
 The earlier dark, blue-dot version is kept on `orb`, and the old Jekyll CV lives on in `gh-pages`' history. Its `projects.html` URL now redirects to `/#projects`. A planned move to `biunefrandsen.dk` is described in `DOMAIN-MIGRATION.md`.

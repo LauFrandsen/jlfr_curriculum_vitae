@@ -6,7 +6,8 @@
 // flower then stays, mostly whole: now and then a petal (at most two) breaks apart and falls away on
 // the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
 
-import { STORY_DOTS, STORY_TOTAL, evenOrder, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, panOf, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { play } from '../sound.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -57,6 +58,8 @@ const PHASE = {
 const NEVER = 1e9;            // a time that never comes: squares that never let go
 const GROUND = -0.66;         // the soil's surface (stage units; the shader has the same)
 const SOIL_DEPTH = 0.34;
+const GROUND_NEAR = 1.1;      // the ground is full out to this far each side of the stem (stage units),
+const GROUND_FAR = 5;         // and thins out beyond it as far as this (what's seen of it: groundReach)
 const FOOT = -0.08;           // the stem starts this far below the ground, in stem heights
 const HEAD_RADIUS = 0.09;
 const HEAD_SQUARES = 110;
@@ -74,6 +77,7 @@ attribute vec3 aInfo;     // x = part; y = stem height it branches off at (petal
 uniform float uGrow, uFlight, uGravity, uFallSeconds;
 uniform vec4 uStem;       // stem height, bend, bend phase, lean
 uniform float uPitch, uSway, uSwaySpeed, uGust;
+uniform vec2 uGround;     // how far the ground is seen to the left and to the right of the stem
 
 const float GROUND = ${GROUND.toFixed(3)};
 const float FOOT = ${FOOT.toFixed(3)};
@@ -101,25 +105,34 @@ vec3 view(vec3 p) {
   return vec3(p.x, GROUND + y * c - p.z * s, y * s + p.z * c);
 }
 
-// Which side of the screen a square comes in from: either, with the flower in the middle; the
-// nearer side with the flower off to one side (beside the CV), so squares never cross the text.
-float sideOf(float r) {
+// How strongly the ground shows at x: full near the flower, fading out to how far it's seen that side.
+float groundFade(float x) {
+  return 1.0 - smoothstep(0.6, x < 0.0 ? uGround.x : uGround.y, abs(x));
+}
+
+// Which side of the screen a square comes in from (-1 left, 1 right): either, with the flower in the
+// middle; the nearer side with the flower off to one side (beside the CV), so squares never cross the
+// text. A square of the ground (x: where it lies; 0 for the rest) comes in on its own side while the
+// flower is in the middle, so it never has to cross under the flower.
+float sideOf(float r, float x) {
   float leftShare = 1.0 - smoothstep(0.38, 0.62, uCenter.x / uResolution.x);
+  if (x != 0.0 && abs(leftShare - 0.5) < 0.25) return sign(x);
   return fract(r * 13.7) < leftShare ? -1.0 : 1.0;
 }
 
-// Where a square enters the soil: at the soil's end on its side, somewhere in its depth.
-vec3 entry(float r) {
-  return vec3(sideOf(r) * (0.78 + 0.25 * fract(r * 17.3)), GROUND - 0.03 - 0.22 * fract(r * 4.9),
-              (fract(r * 8.3) - 0.5) * 0.5);
+// Where a square enters the soil: near the end of its middle part on its side, somewhere in its depth;
+// a square of the ground lying further out on that side enters right below its place.
+vec3 entry(float side, float r, float x) {
+  float out1 = 0.78 + 0.25 * fract(r * 17.3);
+  if (x * side > out1) out1 = abs(x);
+  return vec3(side * out1, GROUND - 0.03 - 0.22 * fract(r * 4.9), (fract(r * 8.3) - 0.5) * 0.5);
 }
 
-// A square's way in on screen (device px) at progress p, ending where it enters the soil (at). It
-// sets off just off its side edge, anywhere from a little above the ground to below the bottom of the
-// screen, runs along the edge and turns in at the ground's height, so it never crosses the text in
-// the middle of the screen.
-vec2 wayIn(float p, float r, vec2 at) {
-  float side = sideOf(r);
+// A square's way in on screen (device px) at progress p, from its side, ending where it enters the
+// soil (at). It sets off just off its side edge, anywhere from a little above the ground to below the
+// bottom of the screen, runs along the edge and turns in at the ground's height, so it never crosses
+// the text in the middle of the screen.
+vec2 wayIn(float p, float side, float r, vec2 at) {
   float margin = uDotSize * uRadius * 2.0;
   float edge = side < 0.0 ? -margin : uResolution.x + margin;
   vec2 from = vec2(edge, mix(at.y - uRadius * 0.9, uResolution.y + uRadius * 0.3, fract(r * 23.1)));
@@ -177,10 +190,11 @@ void main() {
       float u = (t - ta + flight) / flight;
       float q = fallCurve(u, uGravity, uLanding);
       fade = smoothstep(0.0, 0.06, u);
-      vec3 e = entry(r);
+      float x = part < 0.5 ? aTarget.x : 0.0, side = sideOf(r, x);
+      vec3 e = entry(side, r, x);
       if (q < SCREEN_SHARE) {
         float es;
-        start = wayIn(q / SCREEN_SHARE, r, project(view(e), es));
+        start = wayIn(q / SCREEN_SHARE, side, r, project(view(e), es));
         screenMix = 0.0;
         pos = e;
       } else {
@@ -202,8 +216,9 @@ void main() {
           + (vec3(r, fract(r * 5.3), fract(r * 9.1)) - 0.5) * 0.02 * v;
       fade = 1.0 - smoothstep(0.35, 1.0, v);
     }
-    // The soil fades toward its edges; stem and head a little darker than petals and leaves.
-    ink *= part < 0.5 ? aInfo.y : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
+    // The ground fades out to the sides, as far as it's seen; stem and head a little darker than
+    // petals and leaves.
+    ink *= part < 0.5 ? aInfo.y * groundFade(aTarget.x) : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
   }
 
   vec3 p = view(sway(pos));
@@ -258,24 +273,32 @@ function square(p, land, letGo, part, info) {
   return [p[0], p[1], p[2], land, letGo, part, info, Math.random()];
 }
 
-// The soil: a jittered grid of squares on its surface, so the ground reads as a field receding into
-// the page, over looser soil that thins out with depth, all of it fading out toward the ends. It forms
-// from the middle outward. The CV entries' squares land on its surface around the stem.
+// The ground: a jittered grid of squares on its surface, so it reads as a field receding into the
+// page, over looser soil that thins out with depth. It's full out to GROUND_NEAR each side of the stem
+// and thins out beyond, a square there kept with a chance of GROUND_NEAR / its distance, as far as
+// GROUND_FAR; the shader fades it out as far as it's seen (groundReach), so it carries on to the
+// screen's edges. It forms from the middle outward. The CV entries' squares land on its surface around
+// the stem.
 function makeSoil() {
   const w = [Math.random() * 6, Math.random() * 6, Math.random() * 6];
   const surface = (x, z) => GROUND + 0.012 * Math.sin(x * 5 + w[0]) + 0.008 * Math.sin(x * 13 + w[1]) + 0.006 * Math.sin(z * 9 + w[2]);
   const squares = [];
-  const add = (x, z, depth) => {
-    const ink = (1 - smooth(0.62, 1.08, Math.abs(x))) * (1 - smooth(0.26, 0.42, Math.abs(z))) * Math.exp(-depth / 0.16);
-    if (ink < 0.04) return;
-    const order = 0.55 * Math.abs(x) / 1.08 + 0.45 * Math.random();
+  const add = (x, z, depth, thin = true) => {
+    const ink = (1 - smooth(0.26, 0.42, Math.abs(z))) * Math.exp(-depth / 0.16);
+    if (ink < 0.04 || (thin && Math.abs(x) > GROUND_NEAR && Math.random() > GROUND_NEAR / Math.abs(x))) return;
+    const order = (0.55 * Math.abs(x)) / (Math.abs(x) + 0.6) + 0.45 * Math.random();
     squares.push(square([x, surface(x, z) - depth, z], lerp(...PHASE.ground, order), 0, SOIL, ink * 0.65));
   };
-  for (let x = -1.08; x <= 1.08; x += 0.04) {
+  for (let x = -GROUND_FAR; x <= GROUND_FAR; x += 0.04) {
     for (let z = -0.42; z <= 0.42; z += 0.04) add(x + (Math.random() - 0.5) * 0.016, z + (Math.random() - 0.5) * 0.016, Math.random() * 0.01);
   }
-  for (let i = 0; i < CONFIG.soilCount; i++) {
-    add((Math.random() * 2 - 1) * 1.08, (Math.random() * 2 - 1) * 0.42, 0.012 + Math.min(SOIL_DEPTH, -Math.log(1 - Math.random() * 0.97) * 0.08));
+  // Below the surface: soilCount squares under its full part, and half as many again thinning out
+  // beyond it (spread as one over the distance, like the surface).
+  const below = () => 0.012 + Math.min(SOIL_DEPTH, -Math.log(1 - Math.random() * 0.97) * 0.08);
+  for (let i = 0; i < CONFIG.soilCount; i++) add((Math.random() * 2 - 1) * GROUND_NEAR, (Math.random() * 2 - 1) * 0.42, below());
+  for (let i = 0; i < CONFIG.soilCount / 2; i++) {
+    const x = GROUND_NEAR * (GROUND_FAR / GROUND_NEAR) ** Math.random() * (Math.random() < 0.5 ? -1 : 1);
+    add(x, (Math.random() * 2 - 1) * 0.42, below(), false);
   }
   const story = [];
   for (let i = 0; i < STORY_TOTAL; i++) {
@@ -406,6 +429,7 @@ function build() {
   if (!squares) {
     const soil = makeSoil();
     squares = soil.story.concat(evenOrder(soil.squares.concat(makeFlower(shape)), (s) => s));
+    indexLandings();
   }
   const data = new Float32Array(squares.length * 8);
   squares.forEach(([x, y, z, land, letGo, part, info, r], k) => {
@@ -430,6 +454,7 @@ let gust = 0;       // a press sends a gust of wind through the flower
 // breaks apart (NEVER until it's picked) and when its replacement sets off.
 const petals = [];
 let petalsChanged = false;   // a petal's schedule changed since the squares were built
+let bloomed = false;         // it has been in full bloom (heard once, as it first gets there)
 let nextBreak = NEVER;       // when the next petal breaks: set once the flower is whole
 let secondBreak = NEVER;     // now and then a second petal follows the first
 
@@ -443,6 +468,7 @@ function grow(p, start, build) {
 // The first petals grow together at the end of the growth.
 function firstPetals() {
   petals.length = 0;
+  bloomed = false;
   const start = PHASE.petals * CONFIG.growSeconds;
   for (let k = 0; k < shape.petals; k++) {
     const p = {};
@@ -460,19 +486,94 @@ function breakPetal() {
   dropPetal(intact[Math.floor(Math.random() * intact.length)]);
 }
 
-// Breaks petal p off now. Its replacement sets off 5-10 s later, once its squares have faded away.
+// Breaks petal p off now, with a thud, and it falls away. Its replacement sets off 5-10 s later, once
+// its squares have faded away.
 function dropPetal(p) {
   p.fall = time;
   const gone = time + 0.15 + CONFIG.petalFallSeconds + 0.2;
   p.next = Math.max(gone, time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
   petalsChanged = true;
+  play('breakoff', { pan: panOf(petalGeo[petals.indexOf(p)]?.tip[0] ?? 0) });
 }
 
-// Puts the flower in full bloom with every petal whole, as it is when it's morphed into.
+// Puts the flower in full bloom with every petal whole, as it is when it's morphed into (silently).
 function settle() {
   time = Math.max(time, ...petals.map((p) => p.start + p.build)) + 0.5;
   for (const p of petals) if (!whole(p)) grow(p, time - p.build - 0.5, p.build);
   nextBreak = secondBreak = NEVER;
+  bloomed = true;
+  petals.forEach((p, k) => { wasWhole[k] = true; });
+}
+
+// ---------- sound ----------
+
+// Each part's squares by when they land, for hearing the growth: [land, x, info] sorted by land
+// (a share of growSeconds; for a petal's squares, of its own build time), per part and per petal.
+let landingsByPart = new Map(), landingsByPetal = [];
+
+function indexLandings() {
+  landingsByPart = new Map();
+  landingsByPetal = [];
+  for (const [x, , , land, , part, info] of squares) {
+    if (part === STORY) continue;
+    if (part === PETAL) (landingsByPetal[info] ??= []).push([land, x, info]);
+    else {
+      if (!landingsByPart.has(part)) landingsByPart.set(part, []);
+      landingsByPart.get(part).push([land, x, info]);
+    }
+  }
+  for (const list of [...landingsByPart.values(), ...landingsByPetal]) list?.sort((a, b) => a[0] - b[0]);
+}
+
+// Which sound a landing square of each part makes, and how often one does (so it never gets busy).
+const VOICES = { [SOIL]: ['soil', 0.05], [ROOT]: ['root', 0.25], [STEM]: ['stem', 0.3], [LEAF]: ['leaf', 0.3], [HEAD]: ['head', 0.2], [PETAL]: ['petal', 0.08] };
+const carry = {};     // per part (or petal), the share of a sound owed so far
+const wasWhole = [];  // per petal, whether it was whole at the last frame
+
+// How many of a list sorted by land have landed by v.
+function landedBy(list, v) {
+  let lo = 0, hi = list.length;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (list[m][0] <= v) lo = m + 1;
+    else hi = m;
+  }
+  return lo;
+}
+
+// As flower time passes from t0 to t1 (a frame): some of the squares that land, each part in its own
+// voice (the stem higher the higher it gets), at most three in a frame; a new petal finished; and the
+// flower in full bloom for the first time. A jump in time is silent.
+function growthSounds(t0, t1) {
+  const natural = t1 > t0 && t1 - t0 < 0.5;
+  let budget = 3;
+  const hear = (part, key, list, from, to) => {
+    const i0 = landedBy(list, from), i1 = landedBy(list, to);
+    if (i1 <= i0) return;
+    const [name, rate] = VOICES[part];
+    carry[key] = (carry[key] ?? 0) + (i1 - i0) * rate;
+    for (; carry[key] >= 1 && budget > 0; carry[key]--, budget--) {
+      const [, x, info] = list[i0 + Math.floor(Math.random() * (i1 - i0))];
+      const pitch = part === STEM ? 0.8 + 0.9 * Math.max(0, info) : 0.92 + Math.random() * 0.16;
+      play(name, { at: Math.random() * (t1 - t0), pan: panOf(x), pitch });
+    }
+    carry[key] = Math.min(carry[key], 1);
+  };
+  if (natural) {
+    for (const [part, list] of landingsByPart) hear(part, part, list, t0 / CONFIG.growSeconds, t1 / CONFIG.growSeconds);
+    petals.forEach((p, k) => {
+      if (landingsByPetal[k]) hear(PETAL, `petal${k}`, landingsByPetal[k], (t0 - p.start) / p.build, (t1 - p.start) / p.build);
+    });
+  }
+  petals.forEach((p, k) => {
+    const w = whole(p);
+    if (w && !wasWhole[k] && natural && bloomed) play('regrown', { pan: panOf(petalGeo[k]?.tip[0] ?? 0) });
+    wasWhole[k] = w;
+  });
+  if (!bloomed && petals.every(whole)) {
+    bloomed = true;
+    if (natural) play('bloomed', { pan: panOf() });
+  }
 }
 
 // ---------- frame ----------
@@ -481,11 +582,22 @@ let lastT = 0;      // the frame clock at the last frame
 
 function frame({ t, dt, set }) {
   const still = reducedMotion.matches;   // with reduced motion: the flower in full bloom, still
+  const before = time;
   if (!still) time += dt;
   lastT = t;
   for (const p of petals) {
-    // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb the stem.
-    if (time >= p.next) grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
+    // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb
+    // the stem, heard coming in from the side(s) they come from and humming until the last one has
+    // landed and the petal is whole.
+    if (time >= p.next) {
+      grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
+      p.hum?.release();
+      p.hum = play('sweep', { pan: panOf(), length: 1.25 * CONFIG.flightSeconds + CONFIG.petalRegrowSeconds, from: 1 - 2 * leftShare() });
+    }
+    if (p.hum && whole(p)) {
+      p.hum.release();
+      p.hum = null;
+    }
   }
   // Once the flower is whole, a petal breaks after a pause, and now and then a second follows it.
   if (nextBreak === NEVER && petals.every(whole)) nextBreak = time + rand(CONFIG.breakPauseMin, CONFIG.breakPauseMax);
@@ -498,6 +610,7 @@ function frame({ t, dt, set }) {
     breakPetal();
     secondBreak = NEVER;
   }
+  growthSounds(before, time);
   if (petalsChanged) rebuild({ keepQuality: true });
   gust *= Math.exp(-dt * 1.2);
 
@@ -508,12 +621,36 @@ function frame({ t, dt, set }) {
   set('uFallSeconds', Math.max(0.2, CONFIG.petalFallSeconds));
   set('uStem', [shape.height, shape.bend, shape.phase, shape.lean]);
   set('uPitch', CONFIG.pitch);
+  reachGround();
+  set('uGround', groundReach);
   set('uSway', still ? 0 : CONFIG.sway);
   set('uSwaySpeed', CONFIG.swaySpeed);
   set('uGust', gust);
 }
 
 // ---------- where things are, as the shader draws them ----------
+
+// The share of squares that come in from the left of the screen (as the shader's sideOf has it):
+// half with the flower in the middle, all of them from the nearer side with it off to one side.
+function leftShare() {
+  const st = stage();
+  return 1 - smooth(0.38, 0.62, st.x / Math.max(st.width, 1));
+}
+
+// How far the ground is seen to the left and to the right of the stem (stage units): a third past the
+// screen's edge, so it seems to carry on beyond it; but beside the CV (the flower off to one side),
+// toward the text it ends close to the flower. The shader's groundFade fades it out to there.
+const groundReach = [GROUND_NEAR, GROUND_NEAR];
+function reachGround() {
+  const st = stage(), r = Math.max(st.radius, 1), left = leftShare();
+  const open = (edge, toward) => {
+    const far = Math.min(GROUND_FAR, Math.max(GROUND_NEAR, (edge / r) * 1.35));
+    return GROUND_NEAR + (far - GROUND_NEAR) * Math.min(1, 2 * toward);
+  };
+  groundReach[0] = open(st.x, left);
+  groundReach[1] = open(st.width - st.x, 1 - left);
+}
+const groundFade = (x) => 1 - smooth(0.6, groundReach[x < 0 ? 0 : 1], Math.abs(x));
 
 const PART_INK = [0, 0.95, 1.2, 1.05, 1.15, 1, 1];   // by part, as in the shader (soil has its own)
 
@@ -538,13 +675,14 @@ function inView([x0, y0, z0], [dx, dz]) {
 function pose(t) {
   const out = [];
   const wind = windAt(t);
+  reachGround();
   for (const [x0, y0, z0, land, letGo, part, info] of squares) {
     const visible = part === STORY ? storyLanded(Math.floor(info / STORY_DOTS))
       : part === PETAL ? time >= petals[info].start + land * petals[info].build && time < petals[info].fall + letGo
-      : time >= land * CONFIG.growSeconds;
+      : time >= land * CONFIG.growSeconds && (part !== SOIL || groundFade(x0) > 0.02);
     if (!visible) continue;
     const [x, y, vz] = inView([x0, y0, z0], wind);
-    out.push(x, y, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info : PART_INK[part], 1, 0);
+    out.push(x, y, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info * groundFade(x0) : PART_INK[part], 1, 0);
   }
   return new Float32Array(out);
 }
@@ -584,7 +722,10 @@ export default {
   frame,
   pose,
   settle,
-  press: () => { gust = 1; },
+  press: () => {
+    gust = 1;
+    play('gust', { pan: panOf() });
+  },
   // Each whole petal is a target of its own: tapping it breaks it off (no limit to how many; they
   // all grow back).
   over: (at) => petalAt(at) >= 0,
