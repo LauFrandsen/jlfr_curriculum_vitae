@@ -51,6 +51,23 @@ drops.forEach((el) => dropper.observe(el));
 const explore = document.querySelector('.explore');
 addEventListener('scroll', () => explore?.classList.toggle('hidden', scrollY > 40), { passive: true });
 
+// On a phone each section's label sticks to the top while its section is in view (style.css); once
+// it has reached the top it's .stuck, and gets the strip of paper the text slides under.
+const labels = [...document.querySelectorAll('.cv h2')];
+function stick() {
+  const top = parseFloat(getComputedStyle(labels[0]).top);   // NaN (auto) where they don't stick
+  for (const h of labels) h.classList.toggle('stuck', h.getBoundingClientRect().top <= top + 0.5);
+}
+if (labels.length) {
+  addEventListener('scroll', stick, { passive: true });
+  addEventListener('resize', stick);
+  // A section still rising into place (.reveal) can carry its label up to the top after the scrolling stops.
+  document.querySelector('.cv').addEventListener('transitionend', (e) => {
+    if (e.propertyName === 'transform') stick();
+  });
+  stick();
+}
+
 document.getElementById('pdf-button')?.addEventListener('click', () => window.print());
 
 // Sound: off until the visitor turns it on with the speaker button in the corner (sound.js remembers

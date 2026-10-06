@@ -1079,13 +1079,35 @@ html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { poi
 
 /* ---------- phones ---------- */
 
-/* Smaller type and tighter spacing, so more of the CV fits on a screen at once. */
+/* Smaller type and tighter spacing, so more of the CV fits on a screen at once. Each section's label
+   stays at the top while its section is in view, on a strip of paper the text slides under, so it's
+   clear where you are. */
 @media (max-width: 480px) {
-  body { font-size: 0.9rem; line-height: 1.55; }
-  .cv section { padding-top: 3.25rem; }
+  body {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    overflow-x: clip;   /* not hidden: that makes it a scroll box once a pane locks the page, and the labels let go */
+  }
+  .cv section {
+    padding-top: 2.55rem;
+    isolation: isolate;   /* the label goes over its section's text, but still under the horizon's fade */
+  }
   .cv p { margin-bottom: 0.8rem; }
   .cv li { margin-bottom: 0.25rem; }
-  .cv h2 { margin-bottom: 1.3rem; }
+  .cv h2 {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 calc(-1 * var(--gutter)) 0.6rem;
+    padding: 0.7rem var(--gutter);
+    transition: background-color 0.2s, box-shadow 0.2s;
+  }
+  .cv h2.stuck {   /* (page.js) */
+    background: rgba(245, 242, 234, 0.88);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 0 var(--line);
+  }
   .cv h3 { font-size: 1rem; }
   .intro { padding-top: 14vh !important; }
   .intro h1 { font-size: 1.9rem; }
