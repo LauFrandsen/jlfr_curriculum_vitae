@@ -28,7 +28,8 @@
 //   data, once it's settled; where square i sits at engine time t: x, y, z, depth and size, as in a
 //   pose; and the four numbers its shader sets markKey to for that square, so it can light it up),
 //   rider(t) (where a camera riding along with it is at engine time t: { eye, target, up } in stage
-//   units, or null if there's nothing to ride) and riding(on) (told when the ride begins and ends),
+//   units, or null if there's nothing to ride), riding(on) (told when the ride begins and ends) and
+//   pace(p) (how fast it moves along while ridden, 1 = as usual),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
 //   over(at) and
 //   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
@@ -286,14 +287,15 @@ bool story(float idx, out float fall, out vec2 start, out float heat, out float 
 //   size       multiplies the sprite
 //   clip       false exempts it from the horizon's clip (story squares falling through it)
 void emit(vec2 screen, float s, float depth, float rim, float heat, float ink, float boost, float size, bool clip) {
-  // A callout's square takes on its colour, a little stronger, and grows a little as it lights.
+  // A callout's square takes on its colour, a little stronger, and grows a little as it lights (more
+  // while riding, seen from further off).
   vec2 mark = vec2(0.0);
   for (int i = 0; i < ${MARKS}; i++) {
     if (distance(markKey, uMarks[i]) < 1e-5) mark = uMarkStates[i];
   }
   vColor = mix(vColor, uMarkColor, mark.x);
   boost += 0.3 * mark.x;
-  size *= 1.0 + 0.35 * mark.y;
+  size *= 1.0 + (0.35 + 1.1 * uRide) * mark.y;
 
   // Pull toward the pointer, strongest for close squares at the front.
   vec2 toPointer = uPointer - screen;
@@ -653,13 +655,13 @@ export function setFocus(on) {
 // Usually the graphic is seen from straight in front, its cameraDistance radii away, the view every
 // graphic is made for. For the tour, riding(true) flies the camera off to ride along with the graphic,
 // where its rider() says (following it there as it moves), its view widening as it goes; riding(false)
-// flies it back. On the way the graphic's place on the screen moves to the middle, and its scorch on
-// the paper fades.
+// flies it back. On the way the graphic's place on the screen moves to where the tour wants the middle
+// of the view, and its scorch on the paper fades.
 const RIDE = {
   there: 4.2,   // seconds to fly there
   back: 2.8,    // seconds to fly back
-  focal: 0.9,   // the ride's focal length, in screen heights (lower = a wider view)
-  middle: 0.44, // where the middle of its view is, down the screen (a little high: the tour's bar is below)
+  focal: 0.62, // the ride's focal length, in screen heights (lower = a wider view), ...
+  narrow: 1.4,  // ... or in this many screen heights' worth of its width, if less (a phone held upright)
   crisp: 0.13,  // how much bigger the solid square's share of its sprite gets (near squares stay crisp)
   home: 0.3,    // flying back, the page comes back once the flight is this far from done
   near: 0.03,   // the near plane (stage units)
@@ -667,6 +669,7 @@ const RIDE = {
 };
 let ride = 0;          // 0 = the usual view .. 1 = riding
 let rideTo = 0;        // where ride is heading
+let rideMiddle = () => [0.5, 0.5];   // where the ride's view has its middle, as shares of the screen
 const view = { eye: [0, 0, 6.4], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, -1], focal: 640, centre: [0, 0], near: 0.03, largest: 1e4, ride: 0 };
 
 const v3 = {
@@ -705,9 +708,10 @@ function aim(graphic, t) {
   view.z = z;
   view.x = x;
   view.y = v3.cross(x, z);
-  const ridden = canvas.height * RIDE.focal;
+  const ridden = RIDE.focal * Math.min(canvas.height, canvas.width * RIDE.narrow);
   view.focal = k === 0 ? radius * C : Math.exp(Math.log(radius * C) + (Math.log(ridden) - Math.log(radius * C)) * k);
-  view.centre = [cx + (canvas.width / 2 - cx) * k, cy + (canvas.height * RIDE.middle - cy) * k];
+  const [mx, my] = rideMiddle();
+  view.centre = [cx + (canvas.width * mx - cx) * k, cy + (canvas.height * my - cy) * k];
   view.near = RIDE.near;
   view.largest = k === 0 ? 1e4 : canvas.height * RIDE.largest / k;
   view.ride = k;
@@ -717,8 +721,10 @@ function aim(graphic, t) {
 const rideGraphic = () => (morph ? morph.to.graphic : shown?.graphic);
 
 // Flies the camera off to ride along with the graphic shown, or being morphed into (on), or back to
-// the usual view.
-export function riding(on) {
+// the usual view. middle() says where on the screen the ride's view has its middle ([x, y], shares of
+// the screen's width and height), asked every frame, so it can follow the screen's shape.
+export function riding(on, middle) {
+  if (middle) rideMiddle = middle;
   if (!shown || (on ? 1 : 0) === rideTo) return;
   rideTo = on ? 1 : 0;
   if (reducedMotion.matches) ride = rideTo;
@@ -728,6 +734,14 @@ export function riding(on) {
 
 // How far the camera is along its flight to the ride: 0 (the usual view) .. 1 (riding).
 export const rideState = () => ride;
+
+// How fast the ridden graphic moves along (1 = its usual pace), e.g. slow while the tour is at a stop.
+export function ridePace(pace) {
+  rideGraphic()?.pace?.(pace);
+}
+
+// Where the camera is (stage units), for graphics that pick what it can see.
+export const cameraEye = () => view.eye;
 
 // Where a stage point (x, y, z) is on the screen as the camera sees it now, in CSS px, with its
 // perspective scale s and whether it's in front of the camera.

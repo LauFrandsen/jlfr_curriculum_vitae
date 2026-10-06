@@ -10,7 +10,7 @@
 // rings with satellites, antennas sending signals, a latitude/longitude grid that turns, and data arcs
 // drawing across the surface. LOOKS below has presets; the ?tune panel switches between them.
 
-import { STORY_DOTS, STORY_TOTAL, evenOrder, exact, panOf, rebuild, reducedMotion, rideState, snoise, stage, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, cameraEye, evenOrder, exact, panOf, rebuild, reducedMotion, rideState, snoise, stage, storyLanded } from '../voxel.js';
 import { play } from '../sound.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
@@ -365,6 +365,7 @@ void main() {
   float heat = 0.0;          // slot-in flash
   bool falling = false;
   bool free = false;         // out in space (orbits, satellites): doesn't turn or breathe with the orb
+  float grown = 1.0;         // the ridden satellite's squares grow while it's ridden
   float fall = 1.0;          // falling dots: 0 = at the start point, 1 = in its slot
   float fallTimeShare = 1.0; // the same, as a plain share of its fall time (no gravity)
   vec2 fallStart = vec2(0.0);
@@ -474,6 +475,14 @@ void main() {
       float angle = launchAngle(k) + sg * lapped(k, s);
       vec3 folded = orbitAt(k, angle + sg * foldAlong * ${SATELLITE_STEP} / r, foldOut * ${SATELLITE_STEP});
       vec3 open = orbitAt(k, angle + aPos.y * ${SATELLITE_STEP} / r, aPos.z * ${SATELLITE_STEP});
+      if (abs(k - uRider) < 0.5 && uRide > 0.0) {
+        // Ridden (the tour), seen from behind and above: its panels swing out across its orbit like
+        // wings, and it grows, so it reads as a satellite from the camera following it.
+        float big = 1.0 + 1.3 * uRide;
+        vec3 body = orbitAt(k, angle + aPos.y * ${SATELLITE_STEP} * big / r, 0.0);
+        open = mix(open, body + orbitNormal(k) * aPos.z * ${SATELLITE_STEP} * big, uRide);
+        grown = 1.0 + 0.6 * uRide;
+      }
       pos = mix(folded, open, smoothstep(0.0, DEPLOY, s));
     }
     free = true;
@@ -492,7 +501,7 @@ void main() {
     if (gone < ahead) fade = 0.0;
     else heat = exp(-(gone - ahead) / lapSpeed(k, s) * 1.4) * 1.1;
     fade *= 1.0 - smoothstep(0.0, 0.5, uNet.x - landTime(k) - 0.4 - hash(aSeed * 91.3) * 2.2);
-    if (abs(k - uRider) < 0.5) fade *= 1.0 - uRide;   // riding on it, its own line isn't seen
+    if (abs(k - uRider) < 0.5) fade *= 1.0 - 0.5 * uRide;   // riding along it, its own line is fainter
   } else if (aSeed >= 3.0) {
     // Story dot: a CV entry's squares, falling in from the entry's marker (see story()).
     float idx = floor((aSeed - 3.0) * ${STORY_TOTAL.toFixed(1)});
@@ -701,7 +710,7 @@ void main() {
 
   // The rim gets a little extra ink so the silhouette reads; story dots may fall through the horizon.
   emit(screen, s, depth, free ? 0.0 : 1.0 - abs(zn), heat, looseDim * fade * (1.0 + rippleInk), uEnergy * 0.1,
-       mix(0.6, 1.0, looseDim) * introSize, aSeed < 3.0 || aSeed >= 4.0);
+       mix(0.6, 1.0, looseDim) * introSize * grown, aSeed < 3.0 || aSeed >= 4.0);
 }`;
 
 // ---------- the squares ----------
@@ -880,15 +889,22 @@ function pose(t) {
 
 // ---------- callouts: the squares one may point at ----------
 
+// Whether its squares may be pointed at: once its opening is over (the intro, and the rockets launched
+// and their orbits laid); while ridden, once the intro is.
+const markable = () => openingOver || (rider >= 0 && introTime >= introEnd());
+
 // Shell squares on the front of the orb (as it's turned now), once its opening is over: the intro,
-// and the rockets launched and their orbits laid.
+// and the rockets launched and their orbits laid. Riding, the front is the side the camera sees,
+// well inside the horizon.
 function marks() {
-  if (!openingOver) return [];
+  if (!markable()) return [];
   const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt), out = [];
+  const eye = rideState() > 0.5 ? cameraEye() : null;
   for (let i = STORY_TOTAL; i < placed.length / 4; i++) {
     if (placed[i * 4 + 3] >= 1) continue;
-    const [, y, z] = spun([placed[i * 4], placed[i * 4 + 1], placed[i * 4 + 2]], spinAngle);
-    if (y * st + z * ct > 0.35) out.push(i);
+    const [x, y, z] = spun([placed[i * 4], placed[i * 4 + 1], placed[i * 4 + 2]], spinAngle);
+    const ty = y * ct - z * st, tz = y * st + z * ct;
+    if (eye ? x * eye[0] + ty * eye[1] + tz * eye[2] > 1.15 : tz > 0.35) out.push(i);
   }
   return out;
 }
@@ -897,7 +913,7 @@ function marks() {
 // the orb's breath and turn (but not the ripples, too small to see).
 function markAt(i, t) {
   const seed = placed[i * 4 + 3];
-  if (!openingOver || !(seed < 1)) return null;   // (the intro played again: a callout showing lets go)
+  if (!markable() || !(seed < 1)) return null;   // (the intro played again: a callout showing lets go)
   const idle = snoise(placed[i * 4] * 2, placed[i * 4 + 1] * 2 + t * 0.2, placed[i * 4 + 2] * 2) * 0.012;
   const reach = (1 + (seed - 0.5) * 0.04 + idle) * breath;
   const [x, y, z] = spun([0, 1, 2].map((k) => placed[i * 4 + k] * reach), spinAngle + (t - lastT) * CONFIG.spin);
@@ -1125,13 +1141,15 @@ function orbitsUp(since) {
 
 // ---------- riding along (the tour) ----------
 
-// The tour's camera rides on the back of a satellite (voxel.js riding): a little above and behind it,
-// looking ahead and down at the orb below, a planet it skims over. While it rides, the satellites stay
-// up (none come down; the engine takes no taps), the orbits open out fully, and everything in orbit
-// slows to a cruise. In orb radii: how far above, behind and to the side of the satellite the camera
-// is (a touch to the side, for a little parallax; its own orbit's line, which it's on, fades while
-// it rides), and how far ahead and down it looks; and how much slower things go.
-const RIDER = { above: 0.18, behind: 0.07, side: 0.02, ahead: 0.6, down: 0.66, slow: 0.55 };
+// The tour's camera rides along with a satellite (voxel.js riding), following it from above and
+// behind: the satellite against the paper below the middle of the view, the orb under it, a planet it
+// circles. While it rides, the satellites stay up (none come down; the engine takes no taps), the
+// orbits open out fully, and everything in orbit moves at the tour's pace (pace: slow at a stop, fast
+// between stops). In orb radii: how far above, behind and to the side of the satellite the camera is
+// (off to one side, so its orbit shows as an arc ahead of it, fainter while it's ridden), and how far
+// ahead of it and below it it looks.
+const RIDER = { above: 0.9, behind: 1.6, side: 0.6, ahead: 0.3, down: 0.7 };
+let pace = 1, paceTo = 1;   // how fast things in orbit go (eased toward paceTo), 1 = as usual
 let rider = -1;        // the satellite ridden (until the camera is back), or -1
 let riding = false;   // the camera is on its way to the ride, or on it
 
@@ -1139,11 +1157,18 @@ let riding = false;   // the camera is on its way to the ride, or on it
 // until the camera has flown back (frame). With none up (a look without orbits), there's no ride.
 function ride(on) {
   riding = on;
+  paceTo = 1;
   if (!on) return;
   rider = -1;
   const count = Math.min(3, CONFIG.orbits);
   for (let k = 0; k < count && rider < 0; k++) {
     if (orbitTime - launches[k] >= LAUNCH.ascent + LAUNCH.deploy && lands[k] === NEVER) rider = k;
+  }
+  // Too early for one (the page has only just opened): the opening skips ahead, the orbits up.
+  if (rider < 0 && count > 0) {
+    introTime = Math.max(introTime, introEnd());
+    orbitsUp(LAUNCH.laid + 30);
+    rider = 0;
   }
   nextLanding = NEVER;
 }
@@ -1293,7 +1318,8 @@ function frame({ t, dt, set, activeCount }) {
   breath = 1 + depth * (0.5 - 0.5 * Math.cos(breathPhase));
   voiceTime += run * CONFIG.voiceSpeed;
   spinAngle += run * CONFIG.spin * slow;
-  orbitTime += run * CONFIG.orbitSpeed * slow * (1 - RIDER.slow * rideState());
+  pace += (paceTo - pace) * (1 - Math.exp(-dt * 1.6));
+  orbitTime += run * CONFIG.orbitSpeed * slow * pace;
   if (reducedMotion.matches && orbitTime < LAUNCH.done) orbitsUp(LAUNCH.laid + 30);   // no launch: the orbits are up
   lastT = t;
   if (!riding && rideState() === 0) rider = -1;
@@ -1390,9 +1416,10 @@ const orb = {
   focus: (on) => { if (on) gather(); },
   // Plays the intro and the launch again (when sound is turned on, so they're heard).
   replay,
-  // The tour rides on the back of a satellite.
+  // The tour rides along with a satellite, at its own pace.
   rider: riderAt,
   riding: ride,
+  pace: (p) => { paceTo = p; },
   // The paper's scorch behind the orb swells a little while it "speaks", and grows with it in the intro.
   halo: () => (0.6 + voice.energy * CONFIG.speech * 0.8) * introShown(),
   sliders: [
