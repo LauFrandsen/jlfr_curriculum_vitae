@@ -986,11 +986,37 @@ html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { poi
 
 /* ---------- phones ---------- */
 
+/* Smaller type and tighter spacing, so more of the CV fits on a screen at once. */
 @media (max-width: 480px) {
-  .cv section { padding-top: 4rem; }
+  body { font-size: 0.9rem; line-height: 1.55; }
+  .cv section { padding-top: 3.25rem; }
+  .cv p { margin-bottom: 0.8rem; }
+  .cv li { margin-bottom: 0.25rem; }
+  .cv h2 { margin-bottom: 1.3rem; }
+  .cv h3 { font-size: 1rem; }
   .intro { padding-top: 14vh !important; }
-  .cv .tl-item { padding-left: 1.6rem; }
+  .intro h1 { font-size: 1.9rem; }
+  .role { font-size: 0.95rem; }
+  .lead { margin-top: 1.25rem !important; font-size: 1rem; }
+  .contact { font-size: 0.74rem; }
+  .chips { gap: 0.3rem; margin-top: 1rem !important; }
+  .chips li, .dialog-body .chips li { padding: 0.14rem 0.48rem; font-size: 0.74rem; }
+  .chips-small li { font-size: 0.7rem; }
+  .cv .tl-item { margin-bottom: 2.1rem; padding-left: 1.6rem; }
+  .tl-marker { top: 0.45rem; }
+  .tl-meta { margin-bottom: 0.6rem !important; font-size: 0.72rem; }
   .project { padding-right: 1rem; }
+  .project .tl-marker { top: 1.6rem; }
+  .skill-group .chips { padding: 0.75rem 1rem !important; }
+  .trait { padding: 1rem 1rem 0.85rem; }
+  .trait h3 { font-size: 0.92rem; }
+  .trait li { font-size: 0.86rem; }
+  .note { font-size: 0.8rem; }
+  .cv h3.sub { margin-top: 2.25rem; }
+  .site-footer { margin-top: 4.5rem; }
+  .dialog-body h2 { font-size: 1.35rem; }
+  .dialog-body .project-summary { font-size: 0.98rem; }
+  .dialog-body li { margin-bottom: 0.4rem; }
 }
 
 /* ---------- print / PDF: clean paper version ---------- */
