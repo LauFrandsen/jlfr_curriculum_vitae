@@ -22,10 +22,13 @@
 //               POSE numbers per square: x, y, z (stage units, as passed to project()), depth, and
 //               the ink, size and boost it passes to emit().
 //   Optional: settle() (put itself in its finished state before it's morphed into, e.g. fully grown),
+//   replay() (play its opening again, so it's heard when sound is turned on),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
 //   over(at) and
 //   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
 //   there, tap handles a tap and returns true if it hit one), and for the tune panel sliders and actions.
+
+import { play, setPresence } from './sound.js';
 
 export const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -621,6 +624,16 @@ export function dropFrom(entry, clientX, clientY, color) {
   storyData.set([clientX * dpr, clientY * dpr, start, 1], entry * 4);
   storyColors.set(parseHex(color) || config.color, entry * 3);
   shown.graphic.onDrop?.(entry, storyData[entry * 4 + 2]);
+  // Sound: the release from the marker, then each square landing (as the shaders time it).
+  if (reducedMotion.matches) {
+    play('land', { pan: panOf() });
+    return;
+  }
+  play('release', { pan: (clientX / innerWidth) * 2 - 1 });
+  for (let sub = 0; sub < STORY_DOTS; sub++) {
+    const at = sub * 0.18 + exact(entry * STORY_DOTS + sub, 0.618034) * 0.12 + Math.max(0.1, config.storyFallSeconds);
+    play('land', { at, pan: panOf(), pitch: 1 + sub * 0.06 });
+  }
 }
 
 // Whether CV entry `entry`'s squares have landed, for poses.
@@ -697,6 +710,7 @@ export function morphTo(g) {
   morphLayer ??= makeLayer(MORPH_SHADER, [['aFrom', 4], ['aTo', 4], ['aLook', 4], ['aMore', 4]]);
   upload(morphLayer, morphData(shown.graphic.pose(last), g.pose(last + MORPH.seconds)));
   morph = { from: shown, to, start: last, restFrom, restTo };
+  play('morph', { pan: panOf(), length: MORPH.seconds });
 }
 
 // Morphs into the next graphic of the rotation now.
@@ -794,6 +808,8 @@ function frame(nowMs) {
   // Focus eases at a steady pace (about 0.8 s end to end); place() smooths the ends.
   focus = focusTarget > focus ? Math.min(focusTarget, focus + dt * 1.25) : Math.max(focusTarget, focus - dt * 1.25);
   place();
+  // Its sounds are quieter once it has glided aside, out of the way of the text.
+  setPresence(1 - 0.55 * recede * (1 - focus));
 
   gl.clear(gl.COLOR_BUFFER_BIT);
   let halo;
@@ -973,6 +989,12 @@ export function current() {
 // room around them.
 export function stage() {
   return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear };
+}
+
+// Where a point x stage units right of the graphic's centre sits across the screen, from -1 (the left
+// edge) to 1 (the right edge), for placing a sound.
+export function panOf(x = 0) {
+  return Math.max(-1, Math.min(1, (cx + x * radius) / Math.max(canvas.width / 2, 1) - 1));
 }
 
 export function getStats() {

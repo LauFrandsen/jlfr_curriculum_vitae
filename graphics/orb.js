@@ -10,7 +10,8 @@
 // rings with satellites, antennas sending signals, a latitude/longitude grid that turns, and data arcs
 // drawing across the surface. LOOKS below has presets; the ?tune panel switches between them.
 
-import { STORY_DOTS, STORY_TOTAL, evenOrder, exact, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, exact, panOf, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { play } from '../sound.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -890,6 +891,12 @@ function addRipple(dir, time) {
   nextRipple = (nextRipple + 1) % RIPPLES;
 }
 
+// A flowing dot slotting in at time t: a ripple, and a soft tick.
+function slotIn(f, t) {
+  addRipple(f.dir, t);
+  play('slot', { pan: panOf(f.dir[0]), pitch: 0.9 + f.k * 0.4 });
+}
+
 // A CV entry's dots each ripple the surface where they slot in (the shader's timing, in 32-bit floats).
 function onDrop(entry, t0) {
   for (let sub = 0; sub < STORY_DOTS; sub++) {
@@ -914,14 +921,14 @@ function flowLandings(prev, now, t, activeCount) {
       const start = (n - f.phase) * cycle;
       const skipped = start >= gathering.start && start < gathering.end;
       const gathered = start < gathering.start && gathering.start < start + fallEnd * cycle;
-      if (!skipped && !gathered) addRipple(f.dir, t - (now - (start + fallEnd * cycle)));
+      if (!skipped && !gathered) slotIn(f, t - (now - (start + fallEnd * cycle)));
     }
     // Drawn in by a press: dots that were mid-fall land a set time (plus their own delay) after it.
     const land = gathering.start + gatherSeconds + f.gatherDelay * CONFIG.gatherJitter;
     if (prev < land && land <= now) {
       const u = gathering.start / cycle + f.phase;
       const phase = u - Math.floor(u);
-      if (phase > 0 && phase < fallEnd) addRipple(f.dir, t - (now - land));
+      if (phase > 0 && phase < fallEnd) slotIn(f, t - (now - land));
     }
   }
   for (let i = 0; i < scheduled.length; ) {
@@ -1051,6 +1058,12 @@ function launchAgain() {
   nextLanding = NEVER;
 }
 
+// The intro from the start, and the launch after it.
+function replay() {
+  introTime = 0;
+  launchAgain();
+}
+
 // All orbits up, as if launched long ago (morphed into, or launched again from the start).
 function orbitsUp(since) {
   for (let k = 0; k < 3; k++) {
@@ -1095,6 +1108,7 @@ function shootDown(k, t) {
   // Where the wreck comes down, as the shader has it (its middle piece), and two ripples beside it.
   const angle = o.launch + o.sign * lapped(k, orbitTime - launches[k] - LAUNCH.ascent);
   const p0 = orbitAt(k, angle, 0), ahead = orbitAt(k, angle + 0.01 * o.sign, 0);
+  play('burst', { pan: panOf(p0[0]) });
   const tangent = norm3([0, 1, 2].map((i) => ahead[i] - p0[i]));
   const at = norm3([0, 1, 2].map((i) => p0[i] + tangent[i] * 1.0));
   const side = norm3(cross3(at, tangent));
@@ -1102,6 +1116,58 @@ function shootDown(k, t) {
   scheduled.push({ dir: at, time: t + CRASH_HIT / speed });
   for (const [k2, delay] of [[1, 0.25], [-1, 0.5]]) {
     scheduled.push({ dir: norm3([0, 1, 2].map((i) => at[i] + side[i] * 0.15 * k2)), time: t + (CRASH_HIT + delay) / speed });
+  }
+}
+
+// ---------- sound ----------
+
+// The intro: a blip for some of the squares as they come in, more and more of them and rising a
+// little, and the core opening out. a, b: the intro's time at the last frame and at this one.
+let blipCarry = 0;
+function introSounds(a, b) {
+  const share = (x) => Math.min(1, Math.max(0, (x - INTRO.delay) / Math.max(CONFIG.introBlipSeconds, 0.01))) ** 2;
+  blipCarry += 46 * (share(b) - share(a));
+  for (; blipCarry >= 1; blipCarry--) {
+    play('blip', {
+      at: Math.random() * (b - a),
+      pan: panOf((Math.random() - 0.5) * 2 * CONFIG.introCore),
+      pitch: 0.85 + 0.4 * share(b) + Math.random() * 0.15,
+    });
+  }
+  const opens = INTRO.delay + CONFIG.introBlipSeconds + INTRO.hold;
+  if (a < opens && b >= opens) play('bloom', { pan: panOf() });
+}
+
+// The orbits, as orbit time passes from `prev` to now (so they keep pace with them): a rocket lifting
+// off, unfolding into its satellite and laying its orbit (a pulse for about every sixth square of it),
+// a satellite coming down onto its pad, and a shot-down one's wreck hitting the orb. A jump in orbit
+// time (morphed into, launched again) is silent.
+const layCarry = [0, 0, 0];
+function orbitSounds(prev) {
+  if (orbitTime < prev || orbitTime - prev > 0.5) return;
+  const speed = Math.max(CONFIG.orbitSpeed, 0.01), frame = (orbitTime - prev) / speed;
+  const passes = (from, to, mark) => from <= mark && to > mark;
+  for (let k = 0; k < Math.min(3, CONFIG.orbits); k++) {
+    const o = ORBITS[k], t0 = prev - launches[k], t1 = orbitTime - launches[k];
+    if (passes(t0, t1, 0)) play('launch', { pan: panOf(o.site[0]), length: LAUNCH.ascent / speed });
+    if (passes(t0, t1, LAUNCH.ascent)) play('deploy', { pan: panOf(orbitAt(k, o.launch, 0)[0]) });
+    if (lands[k] === NEVER && t1 > LAUNCH.ascent) {
+      const laid0 = t0 > LAUNCH.ascent ? Math.min(TAU, lapped(k, t0 - LAUNCH.ascent)) : 0;
+      const laid1 = Math.min(TAU, lapped(k, t1 - LAUNCH.ascent));
+      layCarry[k] += (Math.round((TAU * o.radius) / 0.05) * (laid1 - laid0)) / TAU / 6;
+      const pan = panOf(orbitAt(k, o.launch + o.sign * laid1, 0)[0]);
+      for (; layCarry[k] >= 1; layCarry[k]--) play('lay', { at: Math.random() * frame, pan, pitch: [1.2, 1, 0.84][k] });
+    }
+    const d0 = prev - lands[k], d1 = orbitTime - lands[k];
+    if (crashes[k]) {
+      const left = orbitAt(k, o.launch + o.sign * lapped(k, lands[k] - launches[k] - LAUNCH.ascent), 0)[0];
+      for (const [mark, gain] of [[CRASH_HIT, 1], [CRASH_HIT + 0.25, 0.6], [CRASH_HIT + 0.5, 0.5]]) {
+        if (passes(d0, d1, mark)) play('crash', { pan: panOf(left * 0.6), gain });
+      }
+    } else {
+      if (passes(d0, d1, 0)) play('fold', { pan: panOf(o.site[0]), length: LAUNCH.descent / speed });
+      if (passes(d0, d1, LAUNCH.descent)) play('touchdown', { pan: panOf(o.site[0]) });
+    }
   }
 }
 
@@ -1127,8 +1193,10 @@ function frame({ t, dt, set, activeCount }) {
   const slow = reducedMotion.matches ? 0.3 : 1;
   // The intro plays first (not with reduced motion); everything else waits for it.
   if (reducedMotion.matches) introTime = Math.max(introTime, introEnd());
+  if (introTime < introEnd()) introSounds(introTime, introTime + dt);
   introTime += dt;
   const run = introTime < introEnd() ? 0 : dt;
+  const prevOrbitTime = orbitTime;
 
   // Breathing: smooth in-and-out scale, gentler with reduced motion.
   breathPhase += (run * Math.PI * 2) / CONFIG.breathSeconds;
@@ -1140,6 +1208,7 @@ function frame({ t, dt, set, activeCount }) {
   if (reducedMotion.matches && orbitTime < LAUNCH.done) orbitsUp(LAUNCH.laid + 30);   // no launch: the orbits are up
   lastT = t;
   landings(t);
+  orbitSounds(prevOrbitTime);
   const prevFlowTime = flowTime;
   flowTime += reducedMotion.matches ? run * 0.5 : run;
   flowLandings(prevFlowTime, flowTime, t, activeCount);
@@ -1214,8 +1283,13 @@ const orb = {
     shootDown(k, lastT);
     return true;
   },
-  press: gather,
+  press: () => {
+    gather();
+    play('gather', { pan: panOf() });
+  },
   focus: (on) => { if (on) gather(); },
+  // Plays the intro and the launch again (when sound is turned on, so they're heard).
+  replay,
   // The paper's scorch behind the orb swells a little while it "speaks", and grows with it in the intro.
   halo: () => (0.6 + voice.energy * CONFIG.speech * 0.8) * introShown(),
   sliders: [
@@ -1272,10 +1346,7 @@ const orb = {
     { key: 'looseVoice', label: 'Push when speaking', min: 0, max: 0.6, step: 0.01 },
   ],
   actions: {
-    'Play intro': () => {
-      introTime = 0;
-      launchAgain();
-    },
+    'Play intro': replay,
     'Launch again': launchAgain,
     // Shoots down a satellite on the front of its orbit, as tapping one does.
     'Shoot one down': () => {

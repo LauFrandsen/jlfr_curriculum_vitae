@@ -254,6 +254,32 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   50% { transform: translateY(6px); opacity: 1; }
 }
 
+/* Sound: a small square window in the bottom-right corner, like the hero's links, there all the way
+   down the page. Off (a crossed speaker) until it's pressed; only with JS, which makes the sound. */
+.sound-button {
+  position: fixed;
+  right: max(var(--gutter), env(safe-area-inset-right));
+  bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  z-index: 3;   /* above the graphic on the horizon */
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: rgba(250, 248, 243, 0.6);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+.js .sound-button { display: grid; }
+.sound-button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
+.sound-button[aria-pressed="true"] .sound-mute,
+.sound-button[aria-pressed="false"] .sound-waves { display: none; }
+@media (hover: hover) {
+  .sound-button:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+}
+
 /* ---------- CV column ---------- */
 
 .cv {
@@ -730,7 +756,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }

@@ -4,6 +4,7 @@
 // The panel rebuilds itself for the new graphic after a morph.
 
 import { current, getStats, next } from './voxel.js';
+import { SOUND, SOUNDS, play, setSound, soundOn } from './sound.js';
 
 const SHARED = [
   { group: 'Squares', colors: true },
@@ -30,7 +31,7 @@ const style = document.createElement('style');
 style.textContent = `
 .tune-panel {
   position: fixed; top: 12px; right: 12px; z-index: 10;
-  width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 76px);   /* clear of the sound button */
   display: flex; flex-direction: column;
   background: rgba(250, 248, 243, 0.94); backdrop-filter: blur(8px);
   border: 1px solid rgba(17, 16, 15, 0.42);
@@ -55,6 +56,7 @@ style.textContent = `
 }
 .tune-panel button:hover { background: #11100f; color: #f5f2ea; }
 .tune-panel .tune-stats { margin-top: 8px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.tune-panel select { flex: 2; padding: 5px; font: inherit; border: 1px solid #11100f; background: transparent; color: #11100f; }
 `;
 document.head.append(style);
 
@@ -155,6 +157,42 @@ function open(graphic) {
     controls.forEach((sync) => sync());
   });
   body.append(buttons);
+
+  // Sound (sound.js): the overall volume, the music's level and the effects' room, and any effect on
+  // its own, to listen to.
+  const soundTitle = document.createElement('h4');
+  soundTitle.textContent = 'Sound';
+  body.append(soundTitle);
+  for (const [key, text, max] of [['volume', 'Volume', 2], ['music', 'Music', 1.5], ['reverb', 'Effects: room', 0.8]]) {
+    const label = document.createElement('label');
+    label.innerHTML = `<span>${text}</span><output>${SOUND[key].toFixed(2)}</output><input type="range" min="0" max="${max}" step="0.01" value="${SOUND[key]}">`;
+    label.querySelector('input').addEventListener('input', (e) => {
+      SOUND[key] = Number(e.target.value);
+      label.querySelector('output').textContent = SOUND[key].toFixed(2);
+    });
+    body.append(label);
+  }
+  const listen = document.createElement('div');
+  listen.className = 'tune-buttons';
+  const pick = document.createElement('select');
+  pick.setAttribute('aria-label', 'Sound to play');
+  pick.innerHTML = Object.keys(SOUNDS).map((name) => `<option>${name}</option>`).join('');
+  listen.append(pick);
+  body.append(listen);
+  const playButton = document.createElement('button');
+  playButton.textContent = 'Play';
+  playButton.addEventListener('click', () => {
+    if (soundOn()) {
+      play(pick.value);
+      return;
+    }
+    // Turns sound on first (as the page's sound button does), then plays it.
+    setSound(true);
+    const pageButton = document.getElementById('sound-button');
+    pageButton?.setAttribute('aria-pressed', 'true');
+    setTimeout(() => play(pick.value), 400);
+  });
+  listen.append(playButton);
 
   // Live frame rate and square count, so you can see the cost of each change.
   stats = document.createElement('div');

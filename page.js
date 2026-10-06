@@ -1,7 +1,8 @@
 // Page behaviour around the graphic: picking it, section reveals, CV entries sending their squares
-// into it, project panes, the scroll cue and the PDF button.
+// into it, project panes, the scroll cue, the PDF button and the sound button.
 
-import { dropFrom, reducedMotion, setFocus, start } from './voxel.js';
+import { current, dropFrom, reducedMotion, setFocus, start } from './voxel.js';
+import { play, setSound, soundOn } from './sound.js';
 
 // A graphic of ink squares, picked at random on each visit (?graphic=orb or flower picks one), which
 // morphs into the next one in the list every few minutes of the page being on screen.
@@ -49,6 +50,22 @@ addEventListener('scroll', () => cue?.classList.toggle('hidden', scrollY > 40), 
 
 document.getElementById('pdf-button')?.addEventListener('click', () => window.print());
 
+// Sound: off until the visitor turns it on with the speaker button in the corner (sound.js remembers
+// it). Turned on while the graphic is in view in the hero, it plays its opening again, now heard.
+const soundButton = document.getElementById('sound-button');
+function showSound() {
+  soundButton.setAttribute('aria-pressed', soundOn());
+  soundButton.title = soundOn() ? 'Turn sound off' : 'Turn sound on';
+}
+if (soundButton) {
+  showSound();
+  soundButton.addEventListener('click', () => {
+    setSound(!soundOn());
+    showSound();
+    if (soundOn() && scrollY < innerHeight * 0.3) current()?.replay?.();
+  });
+}
+
 // Projects: clicking one makes the graphic glide aside and swell, the CV dims, and then the project
 // pane opens with the full details. Closing glides the graphic back.
 const dialog = document.getElementById('project-dialog');
@@ -69,15 +86,19 @@ function openProject(article, button) {
 
   document.documentElement.classList.add('focusing');
   setFocus(true);
+  const delay = reducedMotion.matches ? 0 : 650;
+  play('open');
+  play('sheet', { at: delay / 1000 });
   clearTimeout(openTimer);
   openTimer = setTimeout(() => {
     dialog.showModal();
     dialog.scrollTop = 0;
-  }, reducedMotion.matches ? 0 : 650);
+  }, delay);
 }
 
 function closeProject() {
   if (!dialog.open || dialog.classList.contains('closing')) return;
+  play('close');
   dialog.classList.add('closing');
   setTimeout(() => {
     dialog.classList.remove('closing');

@@ -6,7 +6,8 @@
 // flower then stays, mostly whole: now and then a petal (at most two) breaks apart and falls away on
 // the wind, and a few seconds later new squares climb the stem to grow a new one. Drawn by voxel.js.
 
-import { STORY_DOTS, STORY_TOTAL, evenOrder, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, panOf, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { play } from '../sound.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
 export const CONFIG = {
@@ -406,6 +407,7 @@ function build() {
   if (!squares) {
     const soil = makeSoil();
     squares = soil.story.concat(evenOrder(soil.squares.concat(makeFlower(shape)), (s) => s));
+    indexLandings();
   }
   const data = new Float32Array(squares.length * 8);
   squares.forEach(([x, y, z, land, letGo, part, info, r], k) => {
@@ -430,6 +432,7 @@ let gust = 0;       // a press sends a gust of wind through the flower
 // breaks apart (NEVER until it's picked) and when its replacement sets off.
 const petals = [];
 let petalsChanged = false;   // a petal's schedule changed since the squares were built
+let bloomed = false;         // it has been in full bloom (heard once, as it first gets there)
 let nextBreak = NEVER;       // when the next petal breaks: set once the flower is whole
 let secondBreak = NEVER;     // now and then a second petal follows the first
 
@@ -443,6 +446,7 @@ function grow(p, start, build) {
 // The first petals grow together at the end of the growth.
 function firstPetals() {
   petals.length = 0;
+  bloomed = false;
   const start = PHASE.petals * CONFIG.growSeconds;
   for (let k = 0; k < shape.petals; k++) {
     const p = {};
@@ -460,19 +464,96 @@ function breakPetal() {
   dropPetal(intact[Math.floor(Math.random() * intact.length)]);
 }
 
-// Breaks petal p off now. Its replacement sets off 5-10 s later, once its squares have faded away.
+// Breaks petal p off now, with a snap, and it falls away. Its replacement sets off 5-10 s later, once
+// its squares have faded away.
 function dropPetal(p) {
   p.fall = time;
   const gone = time + 0.15 + CONFIG.petalFallSeconds + 0.2;
   p.next = Math.max(gone, time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
   petalsChanged = true;
+  const pan = panOf(petalGeo[petals.indexOf(p)]?.tip[0] ?? 0);
+  play('snap', { pan });
+  play('flutter', { pan, length: CONFIG.petalFallSeconds });
 }
 
-// Puts the flower in full bloom with every petal whole, as it is when it's morphed into.
+// Puts the flower in full bloom with every petal whole, as it is when it's morphed into (silently).
 function settle() {
   time = Math.max(time, ...petals.map((p) => p.start + p.build)) + 0.5;
   for (const p of petals) if (!whole(p)) grow(p, time - p.build - 0.5, p.build);
   nextBreak = secondBreak = NEVER;
+  bloomed = true;
+  petals.forEach((p, k) => { wasWhole[k] = true; });
+}
+
+// ---------- sound ----------
+
+// Each part's squares by when they land, for hearing the growth: [land, x, info] sorted by land
+// (a share of growSeconds; for a petal's squares, of its own build time), per part and per petal.
+let landingsByPart = new Map(), landingsByPetal = [];
+
+function indexLandings() {
+  landingsByPart = new Map();
+  landingsByPetal = [];
+  for (const [x, , , land, , part, info] of squares) {
+    if (part === STORY) continue;
+    if (part === PETAL) (landingsByPetal[info] ??= []).push([land, x, info]);
+    else {
+      if (!landingsByPart.has(part)) landingsByPart.set(part, []);
+      landingsByPart.get(part).push([land, x, info]);
+    }
+  }
+  for (const list of [...landingsByPart.values(), ...landingsByPetal]) list?.sort((a, b) => a[0] - b[0]);
+}
+
+// Which sound a landing square of each part makes, and how often one does (so it never gets busy).
+const VOICES = { [SOIL]: ['soil', 0.05], [ROOT]: ['root', 0.25], [STEM]: ['stem', 0.3], [LEAF]: ['leaf', 0.3], [HEAD]: ['head', 0.2], [PETAL]: ['petal', 0.08] };
+const carry = {};     // per part (or petal), the share of a sound owed so far
+const wasWhole = [];  // per petal, whether it was whole at the last frame
+
+// How many of a list sorted by land have landed by v.
+function landedBy(list, v) {
+  let lo = 0, hi = list.length;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (list[m][0] <= v) lo = m + 1;
+    else hi = m;
+  }
+  return lo;
+}
+
+// As flower time passes from t0 to t1 (a frame): some of the squares that land, each part in its own
+// voice (the stem higher the higher it gets), at most three in a frame; a new petal finished; and the
+// flower in full bloom for the first time. A jump in time is silent.
+function growthSounds(t0, t1) {
+  const natural = t1 > t0 && t1 - t0 < 0.5;
+  let budget = 3;
+  const hear = (part, key, list, from, to) => {
+    const i0 = landedBy(list, from), i1 = landedBy(list, to);
+    if (i1 <= i0) return;
+    const [name, rate] = VOICES[part];
+    carry[key] = (carry[key] ?? 0) + (i1 - i0) * rate;
+    for (; carry[key] >= 1 && budget > 0; carry[key]--, budget--) {
+      const [, x, info] = list[i0 + Math.floor(Math.random() * (i1 - i0))];
+      const pitch = part === STEM ? 0.8 + 0.9 * Math.max(0, info) : 0.92 + Math.random() * 0.16;
+      play(name, { at: Math.random() * (t1 - t0), pan: panOf(x), pitch });
+    }
+    carry[key] = Math.min(carry[key], 1);
+  };
+  if (natural) {
+    for (const [part, list] of landingsByPart) hear(part, part, list, t0 / CONFIG.growSeconds, t1 / CONFIG.growSeconds);
+    petals.forEach((p, k) => {
+      if (landingsByPetal[k]) hear(PETAL, `petal${k}`, landingsByPetal[k], (t0 - p.start) / p.build, (t1 - p.start) / p.build);
+    });
+  }
+  petals.forEach((p, k) => {
+    const w = whole(p);
+    if (w && !wasWhole[k] && natural && bloomed) play('regrown', { pan: panOf(petalGeo[k]?.tip[0] ?? 0) });
+    wasWhole[k] = w;
+  });
+  if (!bloomed && petals.every(whole)) {
+    bloomed = true;
+    if (natural) play('bloomed', { pan: panOf() });
+  }
 }
 
 // ---------- frame ----------
@@ -481,6 +562,7 @@ let lastT = 0;      // the frame clock at the last frame
 
 function frame({ t, dt, set }) {
   const still = reducedMotion.matches;   // with reduced motion: the flower in full bloom, still
+  const before = time;
   if (!still) time += dt;
   lastT = t;
   for (const p of petals) {
@@ -498,6 +580,7 @@ function frame({ t, dt, set }) {
     breakPetal();
     secondBreak = NEVER;
   }
+  growthSounds(before, time);
   if (petalsChanged) rebuild({ keepQuality: true });
   gust *= Math.exp(-dt * 1.2);
 
@@ -584,7 +667,10 @@ export default {
   frame,
   pose,
   settle,
-  press: () => { gust = 1; },
+  press: () => {
+    gust = 1;
+    play('gust', { pan: panOf() });
+  },
   // Each whole petal is a target of its own: tapping it breaks it off (no limit to how many; they
   // all grow back).
   over: (at) => petalAt(at) >= 0,
