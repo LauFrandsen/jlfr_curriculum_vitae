@@ -13,10 +13,12 @@
 // holds until something is over.
 
 // A phone (a touch screen and no mouse): its small speaker can't play the deep bass, and driven with it
-// anyway it crackles, so there the sound is cut below lowCut. Its audio also falls behind more easily
-// (busy drawing the graphic, say), which crackles too, so it gets bigger audio buffers (the sound comes
-// a little later) and a shorter reverb for the music, which is most of the music's work.
+// anyway it crackles, so there the sound is cut below lowCut. Its audio also falls behind more easily,
+// the more so the busier the sound and the graphic are, which crackles too, so it works further ahead
+// (PHONE_BUFFER seconds; the sound comes that much later) and the music's reverb, which is most of
+// the music's work, is shorter.
 const PHONE = matchMedia('(pointer: coarse) and (hover: none)').matches;
+const PHONE_BUFFER = 0.08;
 
 // Tunable (the ?tune panel): overall volume, the music's level, how much of the effects comes back
 // from the room, and below what pitch (Hz) everything is cut (0: nothing is).
@@ -560,11 +562,14 @@ function roomResponse(seconds, bright, fall) {
 function build() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return false;
-  try {
-    ctx = new AC(PHONE ? { latencyHint: 'playback' } : undefined);
-  } catch {
-    ctx = new AC();
+  // A browser that won't take the phone's buffer (a number of seconds) gets the next best it will.
+  for (const options of PHONE ? [{ latencyHint: PHONE_BUFFER }, { latencyHint: 'playback' }, {}] : [{}]) {
+    try {
+      ctx = new AC(options);
+      break;
+    } catch { /* the next */ }
   }
+  if (!ctx) return false;
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -14;
   limiter.knee.value = 10;
