@@ -12,9 +12,13 @@
 // side it comes in from, -1 left .. 1 right, 0 both). It returns a handle to let go of an effect that
 // holds until something is over.
 
-// Tunable (the ?tune panel): overall volume, the music's level, and how much of the effects comes back
-// from the room.
-export const SOUND = { volume: 1, music: 0.1, reverb: 0.25 };
+// A phone (a touch screen and no mouse): its small speaker can't play the deep bass, and driven with it
+// anyway it crackles, so there the sound is cut below lowCut.
+const PHONE = matchMedia('(pointer: coarse) and (hover: none)').matches;
+
+// Tunable (the ?tune panel): overall volume, the music's level, how much of the effects comes back
+// from the room, and below what pitch (Hz) everything is cut (0: nothing is).
+export const SOUND = { volume: 1, music: 0.1, reverb: 0.25, lowCut: PHONE ? 120 : 0 };
 
 const MAX_VOICES = 48;   // effects playing at once; any more are skipped
 // A minor pentatonic, from A2 up.
@@ -26,6 +30,7 @@ try { on = localStorage.getItem('sound') === 'on'; } catch { /* no storage: off 
 
 let ctx = null;            // the audio context, made at the first gesture with sound on
 let master, fx, mix, room; // overall level, the effects' level, the mix they go into, their room
+let lowCut = [];           // the filters cutting the deep bass (on a phone)
 let noise = null;          // two seconds of white noise, for the breaths and the wind
 let voices = 0;
 let presence = 1;          // how present the graphic is: its effects are quieter once it has glided aside
@@ -532,7 +537,8 @@ function roomResponse(seconds, bright, fall) {
 
 // The effects go into the mix, and from there into their small room and on through their level
 // (which follows the graphic's presence); the music has its own level. Both go to the overall level,
-// and a limiter at the end keeps many at once from clipping.
+// then through the low cut (a steep highpass, two filters deep), and a limiter at the end keeps many
+// at once from clipping.
 function build() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return false;
@@ -544,8 +550,15 @@ function build() {
   limiter.attack.value = 0.003;
   limiter.release.value = 0.25;
   limiter.connect(ctx.destination);
+  lowCut = [0.54, 1.31].map((q) => {
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.Q.value = q;
+    return f;
+  });
+  lowCut[0].connect(lowCut[1]).connect(limiter);
   master = ctx.createGain();
-  master.connect(limiter);
+  master.connect(lowCut[0]);
   fx = ctx.createGain();
   fx.connect(master);
   mix = ctx.createGain();
@@ -567,11 +580,13 @@ function build() {
 // Sets the levels from SOUND and the graphic's presence (gliding there), if they've changed or `now`.
 function levels(now = false) {
   if (!ctx) return;
-  const key = `${SOUND.volume} ${SOUND.music} ${SOUND.reverb} ${presence.toFixed(2)}`;
+  const key = `${SOUND.volume} ${SOUND.music} ${SOUND.reverb} ${SOUND.lowCut} ${presence.toFixed(2)}`;
   if (key === applied && !now) return;
   applied = key;
   const t = ctx.currentTime;
   master.gain.setTargetAtTime(SOUND.volume, t, 0.1);
+  // With no cut, the filters sit far below anything heard.
+  for (const f of lowCut) f.frequency.setTargetAtTime(Math.max(SOUND.lowCut, 10), t, 0.1);
   fx.gain.setTargetAtTime(presence, t, 0.15);
   room.gain.setTargetAtTime(SOUND.reverb, t, 0.15);
   // The music fades in when it starts.

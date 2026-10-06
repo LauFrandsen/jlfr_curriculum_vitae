@@ -161,17 +161,19 @@ function open(graphic) {
   });
   body.append(buttons);
 
-  // Sound (sound.js): the overall volume, the music's level and the effects' room, and any effect on
-  // its own, to listen to.
+  // Sound (sound.js): the overall volume, the music's level, the effects' room and the low cut (on by
+  // default on a phone), and any effect on its own, to listen to.
   const soundTitle = document.createElement('h4');
   soundTitle.textContent = 'Sound';
   body.append(soundTitle);
-  for (const [key, text, max] of [['volume', 'Volume', 2], ['music', 'Music', 1.5], ['reverb', 'Effects: room', 0.8]]) {
+  const soundControls = [['volume', 'Volume', 2, 0.01], ['music', 'Music', 1.5, 0.01], ['reverb', 'Effects: room', 0.8, 0.01], ['lowCut', 'Cut below (Hz)', 300, 1]];
+  for (const [key, text, max, step] of soundControls) {
     const label = document.createElement('label');
-    label.innerHTML = `<span>${text}</span><output>${SOUND[key].toFixed(2)}</output><input type="range" min="0" max="${max}" step="0.01" value="${SOUND[key]}">`;
+    const shown = () => SOUND[key].toFixed(step < 1 ? 2 : 0);
+    label.innerHTML = `<span>${text}</span><output>${shown()}</output><input type="range" min="0" max="${max}" step="${step}" value="${SOUND[key]}">`;
     label.querySelector('input').addEventListener('input', (e) => {
       SOUND[key] = Number(e.target.value);
-      label.querySelector('output').textContent = SOUND[key].toFixed(2);
+      label.querySelector('output').textContent = shown();
     });
     body.append(label);
   }
