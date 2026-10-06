@@ -182,7 +182,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   justify-content: center;
   gap: clamp(3rem, 11svh, 7rem);
   padding: var(--gutter);
-  padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 60px);   /* room for the scroll cue */
+  padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 6.5rem);   /* room for Explore */
   pointer-events: none;   /* taps and hovers reach the canvas underneath */
 }
 
@@ -234,25 +234,98 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 }
 .hero-links a:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 
-.scroll-cue {
+/* Explore: a window at the bottom of the hero that starts the guided tour (tour.js). It's made like
+   the graphics: tour.js draws its edge in ink squares, each with its soft burn. It hovers over the
+   paper, rising and sinking slowly, its scorch below it fading as it rises, and lifts a little more
+   under the mouse; its arrow nudges down. Over it, a line about the tour shows on hover or keyboard
+   focus (only with JS, which runs the tour). It all fades once the page is scrolled. */
+.explore {
   position: absolute;
-  bottom: max(1.25rem, env(safe-area-inset-bottom));
   left: 50%;
+  bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 0.25rem);
+  translate: -50% 0;
   display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-left: -22px;
-  color: var(--muted);
-  pointer-events: auto;
+  justify-items: center;
   transition: opacity 0.4s;
 }
-.scroll-cue svg { animation: cue 2.6s ease-in-out infinite; }
-.scroll-cue.hidden { opacity: 0; pointer-events: none; }
+.explore.hidden { opacity: 0; }
+.explore.hidden .explore-button { pointer-events: none; }
+
+.explore-float { animation: float 6s ease-in-out infinite; }
+.explore-shadow {
+  width: 82%;
+  height: 16px;
+  margin-top: 10px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(58, 38, 20, 0.15), rgba(58, 38, 20, 0.05) 60%, transparent);
+  animation: float-shadow 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+@keyframes float-shadow {
+  0%, 100% { scale: 1; opacity: 1; }
+  50% { scale: 0.84; opacity: 0.55; }
+}
+
+.explore-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1.05rem 1.6rem 1.05rem 2.05rem;
+  border: 1px solid var(--ink);   /* until tour.js draws its squares */
+  background: rgba(250, 248, 243, 0.5);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  text-decoration: none;
+  pointer-events: auto;   /* the rest of the hero lets pointers through to the graphic */
+  transition: background-color 0.4s, translate 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.explore-button.drawn { border-color: transparent; }
+.explore-button canvas {
+  position: absolute;
+  inset: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  pointer-events: none;
+}
+.explore-button svg { animation: cue 2.6s ease-in-out infinite; }
+@media (hover: hover) {
+  .explore-button:hover { translate: 0 -3px; background-color: rgba(250, 248, 243, 0.85); }
+}
+
+.explore-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  display: none;
+  width: max-content;
+  max-width: min(23rem, 100vw - 2 * var(--gutter));
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.55;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-wrap: balance;
+  opacity: 0;
+  translate: -50% 6px;
+  pointer-events: none;
+  transition: opacity 0.4s, translate 0.4s;
+}
+.js .explore-hint { display: block; }
+.explore:has(.explore-button:hover) .explore-hint,
+.explore:has(.explore-button:focus-visible) .explore-hint { opacity: 1; translate: -50% 0; }
 
 @keyframes cue {
-  0%, 100% { transform: translateY(0); opacity: 0.6; }
-  50% { transform: translateY(6px); opacity: 1; }
+  0%, 100% { transform: translateY(-1px); opacity: 0.6; }
+  50% { transform: translateY(3px); opacity: 1; }
 }
 
 /* Callouts (callouts.js): a square of the graphic turns --signal (the graphic draws that) and a line
@@ -329,6 +402,114 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .sound-button[aria-pressed="false"] .sound-waves { display: none; }
 @media (hover: hover) {
   .sound-button:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+}
+
+/* The guided tour (tour.js): a window along the bottom, beside the sound button on phones (over the
+   horizon, where the text has faded anyway) and under the CV's column on wider screens. The part
+   it's at is named over a line about it, with a small square per stop, filled in ink up to the one
+   it's at (scorched), and Back and Next. It slides away while a project pane is open. */
+.tour {
+  position: fixed;
+  left: max(var(--gutter), env(safe-area-inset-left));
+  right: calc(max(var(--gutter), env(safe-area-inset-right)) + 48px);   /* clear of the sound button */
+  bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  z-index: 3;   /* above the graphic on the horizon */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.2rem 0.75rem;
+  padding: 0.7rem 0.7rem 0.7rem 1rem;
+  border: 1px solid var(--line-strong);
+  background: rgba(250, 248, 243, 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px -26px rgba(58, 38, 20, 0.45);
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.tour[hidden] { display: none; }
+.tour.away, html.focusing .tour { opacity: 0; transform: translateY(16px); pointer-events: none; }
+
+@media (min-width: 720px) {
+  .tour { left: 50%; right: auto; width: 34rem; translate: -50% 0; }
+}
+@media (min-width: 1100px) {   /* under the CV's column, which sits to the left */
+  .tour { left: calc(max(7vw, 48px) + var(--gutter)); translate: none; }
+}
+
+.tour-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.tour-end {
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -0.3rem -0.3rem 0 0;
+  padding: 0;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.tour-text {
+  grid-column: 1 / -1;
+  margin: 0 0 0.45rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.tour-stops {
+  display: flex;
+  margin: 0 0 0 -5px;
+  padding: 0;
+  list-style: none;
+}
+.tour-stop {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tour-stop::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--line-strong);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+.tour-stop.seen::before { border-color: var(--ink); background: var(--ink); }
+.tour-stop[aria-current]::before { box-shadow: 0 0 6px 2px color-mix(in srgb, var(--burn) 40%, transparent); }
+.tour-steps { display: flex; gap: 0.4rem; }
+.tour-steps button {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+}
+.tour-steps .tour-next { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.tour-back:disabled { opacity: 0.35; cursor: default; }
+@media (hover: hover) {
+  .tour-end:hover { border-color: var(--line-strong); color: var(--ink); }
+  .tour-back:not(:disabled):hover { border-color: var(--ink); }
+  .tour-steps .tour-next:hover { background: transparent; color: var(--ink); }
 }
 
 /* ---------- CV column ---------- */
@@ -753,6 +934,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
 
 /* footer */
 .site-footer {
+  scroll-margin-top: 3rem;   /* the tour's last stop */
   margin-top: 6rem;
   padding-top: 2rem;
   border-top: 1px solid var(--line);
@@ -786,9 +968,12 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
 }
 .js .reveal.visible { opacity: 1; transform: none; }
 
+/* On the guided tour, the rest of the CV dims around the part it's at. */
+.js.touring .cv > .reveal.visible:not(.tour-here) { opacity: 0.3; }
+
 @media (prefers-reduced-motion: reduce) {
   .js .reveal { opacity: 1; transform: none; transition: none; }
-  .scroll-cue svg, .tl-marker { animation: none !important; }
+  .explore-button svg, .explore-float, .explore-shadow, .tl-marker { animation: none !important; }
   .project, .project-hint { transition: none; }
 }
 
@@ -817,7 +1002,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .callout, .callout-box, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .tour, .callout, .callout-box, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }

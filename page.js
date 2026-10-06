@@ -1,10 +1,11 @@
 // Page behaviour around the graphic: picking it, section reveals, CV entries sending their squares
-// into it, project panes, the scroll cue, the PDF button and the sound button. (callouts.js runs the
-// graphic's callouts on its own.)
+// into it, project panes, the Explore button, the PDF button and the sound button. (callouts.js runs
+// the graphic's callouts on its own, and tour.js the guided tour.)
 
 import { current, dropFrom, reducedMotion, setFocus, start } from './voxel.js';
 import { play, setSound, soundOn } from './sound.js';
 import './callouts.js';
+import './tour.js';
 
 // A graphic of ink squares, picked at random on each visit (?graphic=orb or flower picks one), which
 // morphs into the next one in the list every few minutes of the page being on screen.
@@ -46,9 +47,9 @@ const dropper = new IntersectionObserver((entries) => {
 }, { threshold: 0.5, rootMargin: '0px 0px -15% 0px' });
 drops.forEach((el) => dropper.observe(el));
 
-// The scroll cue fades once the visitor starts scrolling.
-const cue = document.querySelector('.scroll-cue');
-addEventListener('scroll', () => cue?.classList.toggle('hidden', scrollY > 40), { passive: true });
+// The Explore button (the guided tour, tour.js) fades once the visitor starts scrolling.
+const explore = document.querySelector('.explore');
+addEventListener('scroll', () => explore?.classList.toggle('hidden', scrollY > 40), { passive: true });
 
 document.getElementById('pdf-button')?.addEventListener('click', () => window.print());
 

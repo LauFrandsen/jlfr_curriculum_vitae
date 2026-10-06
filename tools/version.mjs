@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = join(import.meta.dirname, '..');
-const files = ['style.css', 'page.js', 'voxel.js', 'tune.js', 'sound.js', 'callouts.js',
+const files = ['style.css', 'page.js', 'voxel.js', 'tune.js', 'sound.js', 'callouts.js', 'tour.js',
   ...readdirSync(join(root, 'graphics')).filter((f) => f.endsWith('.js')).sort().map((f) => `graphics/${f}`)];
 const hash = createHash('sha256');
 for (const f of files) hash.update(f).update(readFileSync(join(root, f)));
