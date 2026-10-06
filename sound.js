@@ -267,10 +267,10 @@ export const SOUNDS = {
   // hum gathers in the middle as they arrive. It all holds until it's let go (the flower lets go when
   // the last square has landed), then eases away; it lets itself go after `length` at the latest.
   sweep: (s) => {
-    const approach = 4, from = s.from ?? 0, most = (s.length ?? 12) + 4;
+    const approach = 4, from = s.from ?? 0, most = (s.length ?? 12) + 4, volume = 0.63;
     const level = s.ctx.createGain();
-    level.gain.setValueAtTime(1, s.t);
-    level.gain.setValueAtTime(1, s.t + most);
+    level.gain.setValueAtTime(volume, s.t);
+    level.gain.setValueAtTime(volume, s.t + most);
     level.gain.linearRampToValueAtTime(0.0001, s.t + most + 2);
     level.connect(s.out);
     const all = { ...s, out: level };
