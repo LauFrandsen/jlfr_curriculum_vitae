@@ -95,9 +95,9 @@ function hiss(s, { at = 0, filter = 'lowpass', freq, to, glide, q = 0.7, attack 
   return at + attack + decay;
 }
 
-// Noise whose filter wanders: `path` is [[seconds, freq], ...] for the filter, `level` the same for
-// its loudness, and wobble [Hz, depth] sets the filter fluttering.
-function drift(s, { path, level, q = 1, wobble = null }) {
+// Noise whose filter wanders: `path` is [[seconds, freq], ...] for the filter, and `level` the same
+// for its loudness.
+function drift(s, { path, level, q = 1 }) {
   const t = s.t, src = s.ctx.createBufferSource(), f = s.ctx.createBiquadFilter(), g = s.ctx.createGain();
   src.buffer = s.noise;
   src.loop = true;
@@ -108,14 +108,6 @@ function drift(s, { path, level, q = 1, wobble = null }) {
   g.gain.setValueAtTime(0.0001, t);
   for (const [at, v] of level) g.gain.exponentialRampToValueAtTime(Math.max(v, 0.0001), t + at);
   const end = level[level.length - 1][0];
-  if (wobble) {
-    const lfo = s.ctx.createOscillator(), depth = s.ctx.createGain();
-    lfo.frequency.value = wobble[0];
-    depth.gain.value = wobble[1];
-    lfo.connect(depth).connect(f.frequency);
-    lfo.start(t);
-    lfo.stop(t + end + 0.05);
-  }
   src.connect(f).connect(g).connect(s.out);
   src.start(t, Math.random() * 1.5);
   src.stop(t + end + 0.05);
@@ -239,17 +231,20 @@ export const SOUNDS = {
       tone(s, { freq: freq / 2, attack: 0.02, decay: 1, gain: 0.05 }),
     );
   },
-  // A petal breaking off: a dull snap.
-  snap: (s) => Math.max(
-    hiss(s, { filter: 'bandpass', freq: 1300, q: 0.8, attack: 0.001, decay: 0.05, gain: 0.1 }),
-    tone(s, { type: 'triangle', freq: 260, to: 130, attack: 0.002, decay: 0.1, gain: 0.05 }),
-    tone(s, { freq: 80, attack: 0.003, decay: 0.12, gain: 0.08 }),
+  // A petal breaking off: a loud, low thud with a short, dark tail of air.
+  breakoff: (s) => Math.max(
+    tone(s, { freq: 85, to: 40, attack: 0.003, decay: 0.3, gain: 0.32 }),
+    tone(s, { type: 'triangle', freq: 170, to: 70, attack: 0.003, decay: 0.16, gain: 0.08 }),
+    hiss(s, { freq: 320, attack: 0.002, decay: 0.12, gain: 0.12 }),
+    hiss(s, { filter: 'bandpass', freq: 900, attack: 0.001, decay: 0.03, gain: 0.05 }),
+    hiss(s, { at: 0.05, freq: 500, to: 160, attack: 0.05, decay: 0.4, gain: 0.05 }),
   ),
-  // The broken petal falling away on the wind: fluttering low air, sinking as it fades.
-  flutter: (s) => {
-    const l = s.length ?? 3.5;
-    return drift(s, { path: [[0, 700], [l, 220]], level: [[0.25, 0.14], [l * 0.6, 0.1], [l, 0.0001]], q: 1.4, wobble: [5, 140] });
-  },
+  // New squares setting off to rebuild a petal: a soft woosh as they sweep in and up the stem.
+  sweep: (s) => drift(s, {
+    path: [[0, 180], [1.4, 750], [3, 300]],
+    level: [[1.2, 0.12], [2, 0.08], [3.2, 0.0001]],
+    q: 0.8,
+  }),
   // Pressing the flower, which sends a gust through it.
   gust: (s) => Math.max(
     drift(s, { path: [[0, 140], [0.5, 700], [1.8, 200]], level: [[0.35, 0.14], [0.8, 0.1], [1.9, 0.0001]], q: 0.6 }),

@@ -464,16 +464,14 @@ function breakPetal() {
   dropPetal(intact[Math.floor(Math.random() * intact.length)]);
 }
 
-// Breaks petal p off now, with a snap, and it falls away. Its replacement sets off 5-10 s later, once
+// Breaks petal p off now, with a thud, and it falls away. Its replacement sets off 5-10 s later, once
 // its squares have faded away.
 function dropPetal(p) {
   p.fall = time;
   const gone = time + 0.15 + CONFIG.petalFallSeconds + 0.2;
   p.next = Math.max(gone, time + rand(CONFIG.regrowSecondsMin, CONFIG.regrowSecondsMax));
   petalsChanged = true;
-  const pan = panOf(petalGeo[petals.indexOf(p)]?.tip[0] ?? 0);
-  play('snap', { pan });
-  play('flutter', { pan, length: CONFIG.petalFallSeconds });
+  play('breakoff', { pan: panOf(petalGeo[petals.indexOf(p)]?.tip[0] ?? 0) });
 }
 
 // Puts the flower in full bloom with every petal whole, as it is when it's morphed into (silently).
@@ -566,8 +564,12 @@ function frame({ t, dt, set }) {
   if (!still) time += dt;
   lastT = t;
   for (const p of petals) {
-    // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb the stem.
-    if (time >= p.next) grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
+    // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb
+    // the stem, with a woosh.
+    if (time >= p.next) {
+      grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
+      play('sweep', { pan: panOf() });
+    }
   }
   // Once the flower is whole, a petal breaks after a pause, and now and then a second follows it.
   if (nextBreak === NEVER && petals.every(whole)) nextBreak = time + rand(CONFIG.breakPauseMin, CONFIG.breakPauseMax);
