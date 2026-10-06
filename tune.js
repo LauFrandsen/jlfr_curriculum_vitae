@@ -139,7 +139,8 @@ function open(graphic) {
     });
   }
   button('Next graphic', () => next());
-  button('Callout', () => callOut());
+  button('Callout: skill', () => callOut('skill'));
+  button('Callout: project', () => callOut('project'));
   button('Copy values', async (b) => {
     const round = (c) => c.map((v) => +v.toFixed(3));
     const text = JSON.stringify({ ...CONFIG, color: round(CONFIG.color), burnColor: round(CONFIG.burnColor) }, null, 2);

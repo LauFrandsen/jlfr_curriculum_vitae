@@ -53,6 +53,9 @@ export const STORY_TOTAL = STORY_ENTRIES * STORY_DOTS;
 // Numbers per square in a graphic's pose(): x, y, z, depth, ink, size, boost.
 export const POSE = 7;
 
+// Squares a callout can light up at once (callouts.js: a project lights several).
+export const MARKS = 6;
+
 // The morph from one graphic to the next, in seconds: the old one fades into the travelling squares,
 // each square sets off within SPREAD (bottom first) and travels for TRAVEL, and the new one fades in
 // under the landed squares at the end.
@@ -168,8 +171,8 @@ uniform vec3 uStoryColor[${STORY_ENTRIES}];
 uniform float uStoryFall, uStoryGlow, uStoryIntegrate;
 uniform float uClipY, uClipFade;         // the horizon: clipped squares fade out above uClipY (device px)
 uniform vec3 uColor;
-uniform vec4 uMark;        // a callout's square (callouts.js): the markKey of the square it points at,
-uniform vec2 uMarkState;   // how far it has taken on uMarkColor (x) and grown (y), 0..1
+uniform vec4 uMarks[${MARKS}];       // a callout's squares (callouts.js): the markKey of each square it lights,
+uniform vec2 uMarkStates[${MARKS}];  // how far each has taken on uMarkColor (x) and grown (y), 0..1
 uniform vec3 uMarkColor;
 
 // Which square this is, for a callout: each graphic sets it from its own data (e.g. its position and
@@ -263,10 +266,13 @@ bool story(float idx, out float fall, out vec2 start, out float heat, out float 
 //   clip       false exempts it from the horizon's clip (story squares falling through it)
 void emit(vec2 screen, float s, float depth, float rim, float heat, float ink, float boost, float size, bool clip) {
   // A callout's square takes on its colour, a little stronger, and grows a little as it lights.
-  float mark = distance(markKey, uMark) < 1e-5 ? 1.0 : 0.0;
-  vColor = mix(vColor, uMarkColor, mark * uMarkState.x);
-  boost += 0.3 * mark * uMarkState.x;
-  size *= 1.0 + 0.35 * mark * uMarkState.y;
+  vec2 mark = vec2(0.0);
+  for (int i = 0; i < ${MARKS}; i++) {
+    if (distance(markKey, uMarks[i]) < 1e-5) mark = uMarkStates[i];
+  }
+  vColor = mix(vColor, uMarkColor, mark.x);
+  boost += 0.3 * mark.x;
+  size *= 1.0 + 0.35 * mark.y;
 
   // Pull toward the pointer, strongest for close squares at the front.
   vec2 toPointer = uPointer - screen;
@@ -840,8 +846,8 @@ function drawGraphic(layer, fade, t, dt) {
   framing = null;
   setShared(layer.graphic.CONFIG, fade);
   const marked = layer === shown && !morph;
-  set('uMark', marked ? mark.key : NO_MARK);
-  set('uMarkState', marked ? mark.state : [0, 0]);
+  set('uMarks', marked ? mark.keys : NO_MARKS);
+  set('uMarkStates', marked ? mark.states : NO_STATES);
   set('uMarkColor', mark.color);
   gl.drawArrays(gl.POINTS, 0, activeOf(layer));
 }
@@ -1064,24 +1070,28 @@ export function marks() {
   return (shown.graphic.marks?.() ?? []).filter((i) => i < drawn);
 }
 
-// The square a callout points at, as the shaders see it (uMark): its markKey, and how far it has
-// taken on the callout's colour (--signal in the CSS) and grown. Far away when there's none.
-const NO_MARK = [1e9, 1e9, 1e9, 1e9];
-const mark = { key: NO_MARK, color: [0.42, 0.29, 0.63], state: [0, 0] };
+// The squares a callout lights up, as the shaders see them (uMarks, uMarkStates): each one's markKey,
+// and how far it has taken on the callout's colour (--signal in the CSS) and grown. Far away when
+// unused.
+const NO_MARKS = new Float32Array(MARKS * 4).fill(1e9), NO_STATES = new Float32Array(MARKS * 2);
+const mark = { keys: NO_MARKS.slice(), states: NO_STATES.slice(), color: [0.42, 0.29, 0.63] };
 {
   const css = parseHex(getComputedStyle(document.documentElement).getPropertyValue('--signal'));
   if (css) mark.color = css;
 }
 
-// Lights up square i (one of marks()) of the graphic shown: lit = how far it has taken on the
-// callout's colour, grow = how far it has grown, both 0..1. clearMark() lets it go.
-export function setMark(i, lit, grow) {
-  mark.key = shown?.graphic.markKey?.(i) ?? NO_MARK;
-  mark.state = [lit, grow];
-}
-export function clearMark() {
-  mark.key = NO_MARK;
-  mark.state = [0, 0];
+// Lights up squares of the graphic shown: a list of up to MARKS [i (one of marks()), lit, grow], lit
+// being how far it has taken on the callout's colour and grow how far it has grown, both 0..1. Squares
+// left out (or setMarks([])) go back to ink.
+export function setMarks(list) {
+  mark.keys.set(NO_MARKS);
+  mark.states.set(NO_STATES);
+  list.slice(0, MARKS).forEach(([i, lit, grow], k) => {
+    const key = shown?.graphic.markKey?.(i);
+    if (!key) return;
+    mark.keys.set(key, k * 4);
+    mark.states.set([lit, grow], k * 2);
+  });
 }
 
 // Where square i (one of marks()) sits on screen now, as the shader draws it at rest, pulled toward

@@ -295,13 +295,15 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   will-change: transform, opacity;
 }
 .callout-box:hover { border-color: var(--signal); }
-/* Its category, small over the skill, like the skill groups' headings. */
+/* Its category, small over the skill, like the skill groups' headings; a project's place and dates
+   under its name. */
 .callout-kind {
   color: var(--muted);
   font-size: 0.58rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+.callout-note { color: var(--muted); font-size: 0.62rem; }
 
 /* Sound: a small square window in the bottom-right corner, like the hero's links, there all the way
    down the page. Off (a crossed speaker) until it's pressed; only with JS, which makes the sound. */
@@ -455,8 +457,9 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   background: rgba(107, 75, 161, 0.08);
   color: var(--signal);
 }
-.languages li strong { transition: color 0.6s; }
-.languages li.found strong { color: var(--signal); }
+.languages li strong, .trait h3, .project-open { transition: color 0.6s; }
+.languages li.found strong, .trait.found h3, .project.found .project-open { color: var(--signal); }
+.project.found { border-color: var(--signal); }
 .chips-small { margin-top: 1rem !important; }
 .chips-small li { font-size: 0.75rem; padding: 0.16rem 0.5rem; }
 
