@@ -24,25 +24,36 @@ const text = bar.querySelector('.tour-text');
 const back = bar.querySelector('.tour-back');
 const next = bar.querySelector('.tour-next');
 
-// The stops: every part of the CV with a data-tour, named by its heading or its data-tour-title.
-const stops = [...document.querySelectorAll('[data-tour]')].map((el) => ({
+// The stops: every part of the CV with a data-tour, named by its heading or its data-tour-title. One
+// meant for the tour only, hidden on the page (the introduction), is left out when the tour goes down
+// the page.
+const allStops = [...document.querySelectorAll('[data-tour]')].map((el) => ({
   el,
   title: el.dataset.tourTitle || el.querySelector('h2')?.textContent.trim() || '',
   text: el.dataset.tour,
 }));
+let stops = allStops;
+let squares = [];
 
-// A square for each stop, filled in ink up to the one shown; a tap goes there.
-const squares = stops.map((stop, i) => {
-  const li = document.createElement('li'), b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'tour-stop';
-  b.title = stop.title;
-  b.setAttribute('aria-label', stop.title);
-  b.addEventListener('click', () => go(i));
-  li.append(b);
-  bar.querySelector('.tour-stops').append(li);
-  return b;
-});
+// Sets the tour's stops, with a square for each in the bar, filled in ink up to the one shown; a tap
+// goes there.
+function setStops(list) {
+  stops = list;
+  const row = bar.querySelector('.tour-stops');
+  row.replaceChildren();
+  squares = list.map((stop, i) => {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tour-stop';
+    b.title = stop.title;
+    b.setAttribute('aria-label', stop.title);
+    b.addEventListener('click', () => go(i));
+    li.append(b);
+    row.append(li);
+    return b;
+  });
+}
+setStops(allStops);
 
 let at = -1;          // the stop shown; -1 when not on the tour
 let rides = false;    // this tour is a ride (otherwise it goes down the page)
@@ -90,6 +101,7 @@ function steer() {
 async function start(byKeyboard) {
   if (at >= 0) return;
   rides = canRide();
+  setStops(rides ? allStops : allStops.filter((s) => !s.el.hidden));
   clearTimeout(hiding);
   bar.hidden = false;
   void bar.offsetWidth;   // (laid out where it starts, so it slides in)
@@ -210,8 +222,16 @@ const textOf = (el) => el?.textContent.replace(/\s+/g, ' ').trim() ?? '';
 const listOf = (els) => [...els].map(textOf);
 
 // What a stop shows: its part of the page, in pieces: { kind (small, over it), title, note (under it),
-// text, chips, more (points shown once opened), links, pdf, open (opens it elsewhere) }.
+// text, chips, more (points shown once opened), links, pdf, open (opens it elsewhere) }. A part for the
+// tour only (the introduction) says it itself: a window per paragraph, its data-kind and data-note,
+// and its <strong> the title.
 function itemsOf(el) {
+  if (el.classList.contains('tour-only')) {
+    return [...el.children].map((p) => {
+      const strong = p.querySelector('strong');
+      return { kind: p.dataset.kind, title: textOf(strong), note: p.dataset.note, text: textOf(p).replace(textOf(strong), '').trim() };
+    });
+  }
   switch (el.id) {
     case 'about': {
       const chips = el.querySelector('.chips');
@@ -296,13 +316,19 @@ function windowOf(item, toggled) {
     }
   }
   const opens = !!item.open || !!item.more?.length || folds || (item.chips?.length ?? 0) > 3;
+  // A window of text alone opens too, but only while its text is cut short (stack() marks it clipped).
+  const clips = !opens && !!item.text;
+  if (clips) el.classList.add('clips');
   if (opens) {
     el.tabIndex = 0;
     el.setAttribute('role', 'button');
     if (!item.open) el.setAttribute('aria-expanded', 'false');
+  }
+  if (opens || clips) {
     add('span', 'ride-cue', item.open ? 'Open →' : '+');
     const act = () => {
       if (item.open) return item.open();
+      if (clips && !el.classList.contains('clipped') && !el.classList.contains('open')) return;
       toggled(!el.classList.contains('open'));
     };
     el.addEventListener('click', act);
@@ -331,7 +357,7 @@ function stack(s) {
     it.card.style.maxHeight = open ? `${wide() ? barTop - 48 : barTop - 12 - innerHeight * 0.2}px` : '';
     it.card.classList.toggle('open', open);
     it.card.classList.toggle('aside', s.open >= 0 && !open);
-    if (!it.item.open && it.card.getAttribute('role')) it.card.setAttribute('aria-expanded', open);
+    if (!it.item.open && it.card.getAttribute('role') && !it.card.classList.contains('clips')) it.card.setAttribute('aria-expanded', open);
     const cue = it.card.querySelector('.ride-cue');
     if (cue && !it.item.open) cue.textContent = open ? '−' : '+';
     it.card.classList.remove('compact');
@@ -349,6 +375,22 @@ function stack(s) {
     }
     return top;
   };
+  // A window of text alone whose text is cut short can be opened to read it whole.
+  for (const it of s.items) {
+    if (!it.card.classList.contains('clips')) continue;
+    const p = it.card.querySelector('.ride-text'), open = it.k === s.open;
+    const can = open || p.scrollHeight > p.clientHeight + 1;
+    it.card.classList.toggle('clipped', can && !open);
+    if (can) {
+      it.card.tabIndex = 0;
+      it.card.setAttribute('role', 'button');
+      it.card.setAttribute('aria-expanded', open);
+    } else {
+      it.card.removeAttribute('tabindex');
+      it.card.removeAttribute('role');
+      it.card.removeAttribute('aria-expanded');
+    }
+  }
   s.box = { left, w, top: place(cards) };
   if (s.open >= 0) place([s.items[s.open].card]);
   for (const it of s.items) it.rect = { x: left, y: parseFloat(it.card.style.top), w, h: it.card.offsetHeight };

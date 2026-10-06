@@ -1048,12 +1048,13 @@ html.focusing .ride { opacity: 0; }
   font-size: 0.8rem;
 }
 /* Squeezed, when a stop's windows don't fit: tighter, the small line and the note side by side, long
-   text cut to three lines, the chips on one row fading out at its end. */
+   text cut to four lines (a tap shows it whole), the chips on one row fading out at its end. */
 .ride-card.compact { grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.6rem; padding: 0.45rem 2rem 0.5rem 0.7rem; font-size: 0.8rem; }
 .ride-card.compact > :not(.ride-cue) { grid-column: 1 / -1; }
 .ride-card.compact .ride-kind { grid-column: 1; }
 .ride-card.compact .ride-note { grid-row: 1; grid-column: 2; justify-self: end; max-width: 100%; overflow: hidden; font-size: 0.66rem; text-overflow: ellipsis; white-space: nowrap; }
-.ride-card.compact .ride-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ride-card.compact .ride-text { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.ride-card.clips:not(.clipped):not(.open) .ride-cue { display: none; }
 .ride-card.compact:not(.open) .ride-chips { flex-wrap: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 80%, transparent); mask-image: linear-gradient(to right, #000 80%, transparent); }
 .ride-card.compact:not(.open) .ride-plus { display: none; }
 .ride-card.compact .ride-chips li { flex: none; }
