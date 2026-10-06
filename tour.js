@@ -1,14 +1,19 @@
 // The guided tour: the hero's Explore button takes the visitor through the CV one part at a time. A
 // bar along the bottom names the part it's at, with a line about it (its data-tour), a square for each
-// stop like the timeline's markers, and Back and Next; the rest of the CV dims a little around it.
-// Scrolling works as ever: the tour follows along to whichever part is in view, and ends on scrolling
-// back up into the hero. ← and → step through it too, and Esc ends it.
+// stop like the timeline's markers, and Back and Next. ← and → step through it too, and Esc ends it.
+//
+// Where the graphic can, the tour is a ride: the page's text gives way and the camera flies off to
+// ride on the back of one of the orb's satellites, the orb a planet below (from the flower, it morphs
+// into the orb on the way up); leaving flies back down to the page. Otherwise (no WebGL, or reduced
+// motion) it goes down the page itself: each stop scrolls its part up, the rest of the CV dims a
+// little around it, and the tour follows the visitor's own scrolling, ending back up in the hero.
 
-import { reducedMotion } from './voxel.js';
+import { current, next as nextGraphic, reducedMotion, riding } from './voxel.js';
 import { play } from './sound.js';
 
 const LINE = 0.4;    // the part shown is the last one whose top has passed this share of the screen's height
 const HERO = 0.6;    // the tour ends once the first part's top is back down below this share of it
+const FLIGHT = 4.2;  // seconds the camera takes to fly up to the ride (voxel.js RIDE.there), for its sound
 
 const root = document.documentElement;
 const explore = document.getElementById('explore-button');
@@ -38,11 +43,15 @@ const squares = stops.map((stop, i) => {
   return b;
 });
 
-let at = -1;        // the stop shown; -1 when not on the tour
-let steering = 0;   // while the tour scrolls the page itself (a timer), it doesn't follow along
-let hiding = 0;     // the timer that hides the bar once it has slid away
+let at = -1;          // the stop shown; -1 when not on the tour
+let rides = false;    // this tour is a ride (otherwise it goes down the page)
+let steering = 0;     // while the tour scrolls the page itself (a timer), it doesn't follow along
+let hiding = 0;       // the timer that hides the bar once it has slid away
 
-// Shows stop i in the bar, and lights up its part of the CV.
+// Whether the tour can be a ride: the graphic is drawn, and motion is welcome.
+const canRide = () => !reducedMotion.matches && !root.classList.contains('no-webgl') && !!current();
+
+// Shows stop i in the bar, and (down the page) lights up its part of the CV.
 function show(i) {
   at = i;
   title.textContent = stops[i].title;
@@ -54,14 +63,15 @@ function show(i) {
   });
   back.disabled = i === 0;
   next.textContent = i === stops.length - 1 ? 'Done' : 'Next';
-  stops.forEach((s, k) => s.el.classList.toggle('tour-here', k === i));
+  stops.forEach((s, k) => s.el.classList.toggle('tour-here', !rides && k === i));
 }
 
-// Goes to stop i: shows it and scrolls its part of the CV up to the top.
+// Goes to stop i: shows it, and down the page scrolls its part of the CV up to the top.
 function go(i) {
   if (i < 0 || i >= stops.length) return;
   if (at >= 0 && i !== at) play('step');
   show(i);
+  if (rides) return;
   steer();
   stops[i].el.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' });
 }
@@ -73,22 +83,36 @@ function steer() {
 }
 
 // Starts the tour; from the keyboard, it takes the focus along to Next.
-function start(byKeyboard) {
+async function start(byKeyboard) {
+  if (at >= 0) return;
+  rides = canRide();
   clearTimeout(hiding);
   bar.hidden = false;
   void bar.offsetWidth;   // (laid out where it starts, so it slides in)
   bar.classList.remove('away');
   root.classList.add('touring');
-  play('open');
   at = -1;
   go(0);
   if (byKeyboard) next.focus({ preventScroll: true });
+  if (!rides) {
+    play('open');
+    return;
+  }
+  // The ride: from the flower, the orb first (its satellites are what's ridden).
+  play('launch', { length: FLIGHT });
+  if (current()?.name !== 'orb') await nextGraphic();
+  if (at >= 0) riding(true);
 }
 
 function end() {
   if (at < 0) return;
   at = -1;
-  play('close');
+  if (rides) {
+    play('fold', { length: 2.8 });
+    riding(false);
+  } else {
+    play('close');
+  }
   root.classList.remove('touring');
   stops.forEach((s) => s.el.classList.remove('tour-here'));
   bar.classList.add('away');
@@ -105,10 +129,10 @@ back.addEventListener('click', () => go(at - 1));
 next.addEventListener('click', () => (at === stops.length - 1 ? end() : go(at + 1)));
 bar.querySelector('.tour-end').addEventListener('click', end);
 
-// Following the visitor's own scrolling: the part in view is the one shown (the last one at the very
-// bottom of the page, which may not reach the line); back up in the hero, the tour is over.
+// Down the page, following the visitor's own scrolling: the part in view is the one shown (the last
+// one at the very bottom of the page, which may not reach the line); back up in the hero, it's over.
 addEventListener('scroll', () => {
-  if (at < 0) return;
+  if (at < 0 || rides) return;
   if (steering) {
     steer();
     return;

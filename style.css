@@ -432,8 +432,9 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 @media (min-width: 720px) {
   .tour { left: 50%; right: auto; width: 34rem; translate: -50% 0; }
 }
-@media (min-width: 1100px) {   /* under the CV's column, which sits to the left */
+@media (min-width: 1100px) {   /* under the CV's column, which sits to the left; riding, in the middle */
   .tour { left: calc(max(7vw, 48px) + var(--gutter)); translate: none; }
+  html.riding .tour { left: 50%; translate: -50% 0; }
 }
 
 .tour-title {
@@ -967,6 +968,12 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   transition: opacity 0.9s ease, transform 0.9s ease;
 }
 .js .reveal.visible { opacity: 1; transform: none; }
+
+/* Riding along (the guided tour as a ride, tour.js): the page's text gives way to the graphic as the
+   camera flies into it, and comes back as it flies back out. */
+html.riding { overflow: hidden; }
+html.riding .cv, html.riding .hero { opacity: 0; transition: opacity 0.9s; }
+html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { pointer-events: none; }
 
 /* On the guided tour, the rest of the CV dims around the part it's at. */
 .js.touring .cv > .reveal.visible:not(.tour-here) { opacity: 0.3; }

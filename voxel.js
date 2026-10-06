@@ -6,7 +6,8 @@
 // project pane (#voxel-focus), lets CV entries send "story" squares into it (dropFrom), handles the
 // pointer and presses, adapts the square count to the device and opens the ?tune panel. Every few
 // minutes it morphs into the next graphic: the squares fly from where they sit in one to where they
-// sit in the other (morphTo).
+// sit in the other (morphTo). For the guided tour, its camera can leave the usual view in front of the
+// graphic and fly off to ride along with it (riding), e.g. on the back of one of the orb's satellites.
 //
 // A graphic is an object with:
 //   name        its name; <html data-graphic> is set to it, so the CSS can place it its own way.
@@ -26,6 +27,8 @@
 //   marks(), markAt(i, t) and markKey(i) (the squares a callout may point at, as indices in its
 //   data, once it's settled; where square i sits at engine time t: x, y, z, depth and size, as in a
 //   pose; and the four numbers its shader sets markKey to for that square, so it can light it up),
+//   rider(t) (where a camera riding along with it is at engine time t: { eye, target, up } in stage
+//   units, or null if there's nothing to ride) and riding(on) (told when the ride begins and ends),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
 //   over(at) and
 //   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
@@ -162,8 +165,12 @@ export function snoise(vx, vy, vz) {
 // box the graphic is placed in, with y up and z toward the viewer.
 const COMMON = `
 precision highp float;
-uniform float uTime, uCamera, uBrightness, uRadius, uDotSize, uSquare, uFade;
+uniform float uTime, uBrightness, uRadius, uDotSize, uSquare, uFade;
 uniform vec2 uCenter, uResolution, uPointer;
+uniform vec3 uEye, uViewX, uViewY, uViewZ;   // the camera: where it is, and its right, up and forward
+uniform float uFocal, uNear, uMaxSize;       // its focal length (device px a stage unit away), its near
+                                             // plane (stage units) and the largest a sprite may be (px)
+uniform float uRide;                         // 0 = the usual view .. 1 = riding along (the tour)
 uniform float uPointerStrength, uPullRadius, uPullStrength, uPullGlow;
 uniform float uLanding, uSlotGlow, uAfterglow;
 uniform vec4 uStory[${STORY_ENTRIES}];   // per CV entry: xy = start (device px), z = drop time, w = 1 once dropped
@@ -210,10 +217,24 @@ float slotHeat(float landed) {
 
 ${NOISE}
 
-// Perspective projection of a stage point to device px; s is the perspective scale.
+// How much of a square shows for being in front of the camera: none behind it, fading in from its
+// near plane. project() sets it (the last call before emit() counts).
+float nearFade = 1.0;
+
+// Perspective projection of a stage point to device px, as the camera sees it; s is the perspective
+// scale (in the usual view, the camera straight in front: 1 at the graphic's centre).
 vec2 project(vec3 p, out float s) {
-  s = uCamera / (uCamera - p.z);
-  return uCenter + vec2(p.x, -p.y) * uRadius * s;
+  vec3 d = p - uEye;
+  float z = dot(d, uViewZ);
+  nearFade = smoothstep(uNear, uNear * 2.5, z);
+  s = uFocal / (uRadius * max(z, uNear));
+  return uCenter + vec2(dot(d, uViewX), -dot(d, uViewY)) * uRadius * s;
+}
+
+// How much p faces the camera, seen from the graphic's centre: from -1 (facing away) to 1 (facing
+// it); in the usual view, p.z / |p|.
+float facing(vec3 p) {
+  return dot(p, normalize(uEye)) / max(length(p), 1e-5);
 }
 
 // Story square idx (0 .. ${STORY_TOTAL - 1}) of the CV entry idx / ${STORY_DOTS}. When the entry
@@ -286,10 +307,11 @@ void emit(vec2 screen, float s, float depth, float rim, float heat, float ink, f
          + heat * (0.3 + 0.7 * depth)) * uBrightness * ink * uFade;
   // On the horizon, keep the text above it clear.
   if (clip) vAlpha *= smoothstep(uClipY - uClipFade, uClipY, screen.y);
+  vAlpha *= nearFade;
 
   // Pull and heat widen the burn, not the square: the sprite grows and the square's share shrinks.
   float grow = 1.0 + lift * 0.8 + heat * 0.8;
-  gl_PointSize = uDotSize * uRadius * 2.0 * s * (0.55 + 0.65 * depth) * grow * size;
+  gl_PointSize = min(uDotSize * uRadius * 2.0 * s * (0.55 + 0.65 * depth) * grow * size, uMaxSize);
   vHalf = uSquare / grow;
   vPixel = 2.0 / max(gl_PointSize, 1.0);
   gl_Position = vec4(screen / uResolution * 2.0 - 1.0, 0.0, 1.0);
@@ -627,6 +649,99 @@ export function setFocus(on) {
   if (reducedMotion.matches) focus = focusTarget;
 }
 
+// ---------- the camera ----------
+// Usually the graphic is seen from straight in front, its cameraDistance radii away, the view every
+// graphic is made for. For the tour, riding(true) flies the camera off to ride along with the graphic,
+// where its rider() says (following it there as it moves), its view widening as it goes; riding(false)
+// flies it back. On the way the graphic's place on the screen moves to the middle, and its scorch on
+// the paper fades.
+const RIDE = {
+  there: 4.2,   // seconds to fly there
+  back: 2.8,    // seconds to fly back
+  focal: 0.9,   // the ride's focal length, in screen heights (lower = a wider view)
+  middle: 0.44, // where the middle of its view is, down the screen (a little high: the tour's bar is below)
+  crisp: 0.13,  // how much bigger the solid square's share of its sprite gets (near squares stay crisp)
+  home: 0.3,    // flying back, the page comes back once the flight is this far from done
+  near: 0.03,   // the near plane (stage units)
+  largest: 0.05,   // the largest a square's sprite may get while riding, in screen heights
+};
+let ride = 0;          // 0 = the usual view .. 1 = riding
+let rideTo = 0;        // where ride is heading
+const view = { eye: [0, 0, 6.4], x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, -1], focal: 640, centre: [0, 0], near: 0.03, largest: 1e4, ride: 0 };
+
+const v3 = {
+  add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  scale: (a, k) => [a[0] * k, a[1] * k, a[2] * k],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  len: (a) => Math.hypot(a[0], a[1], a[2]),
+  norm: (a) => v3.scale(a, 1 / Math.max(v3.len(a), 1e-9)),
+  mix: (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k],
+};
+
+// Turns unit vector a toward unit vector b by share k, along the great circle between them.
+function slerp(a, b, k) {
+  const d = Math.min(1, Math.max(-1, v3.dot(a, b))), angle = Math.acos(d);
+  if (angle < 1e-4) return v3.norm(v3.mix(a, b, k));
+  const sa = Math.sin(angle);
+  return v3.add(v3.scale(a, Math.sin((1 - k) * angle) / sa), v3.scale(b, Math.sin(k * angle) / sa));
+}
+
+// Sets the view for this frame: the usual one, or on the way to (or at) the graphic's ride. The eye
+// swings round the graphic's centre rather than cutting through it, closing in as it turns.
+function aim(graphic, t) {
+  const C = graphic.CONFIG.cameraDistance;
+  const usual = { eye: [0, 0, C], target: [0, 0, 0], up: [0, 1, 0] };
+  const at = ride > 0 ? graphic.rider?.(t) : null;
+  const k = at ? ride * ride * ride * (ride * (ride * 6 - 15) + 10) : 0;   // smootherstep
+  const turn = at ? Math.min(1, k * 1.25) : 0;   // the eye turns round a little ahead of closing in
+  const eye = k === 0 ? usual.eye
+    : v3.scale(slerp([0, 0, 1], v3.norm(at.eye), turn), Math.exp(Math.log(C) + (Math.log(v3.len(at.eye)) - Math.log(C)) * k));
+  const target = k === 0 ? usual.target : v3.mix(usual.target, at.target, k);
+  const up = k === 0 ? usual.up : v3.norm(v3.mix(usual.up, at.up, k));
+  const z = v3.norm(v3.sub(target, eye)), x = v3.norm(v3.cross(z, up));
+  view.eye = eye;
+  view.z = z;
+  view.x = x;
+  view.y = v3.cross(x, z);
+  const ridden = canvas.height * RIDE.focal;
+  view.focal = k === 0 ? radius * C : Math.exp(Math.log(radius * C) + (Math.log(ridden) - Math.log(radius * C)) * k);
+  view.centre = [cx + (canvas.width / 2 - cx) * k, cy + (canvas.height * RIDE.middle - cy) * k];
+  view.near = RIDE.near;
+  view.largest = k === 0 ? 1e4 : canvas.height * RIDE.largest / k;
+  view.ride = k;
+}
+
+// The graphic the camera rides with: the one shown, or the one being morphed into.
+const rideGraphic = () => (morph ? morph.to.graphic : shown?.graphic);
+
+// Flies the camera off to ride along with the graphic shown, or being morphed into (on), or back to
+// the usual view.
+export function riding(on) {
+  if (!shown || (on ? 1 : 0) === rideTo) return;
+  rideTo = on ? 1 : 0;
+  if (reducedMotion.matches) ride = rideTo;
+  rideGraphic().riding?.(on);
+  if (on) document.documentElement.classList.add('riding');   // (frame() takes it off once nearly back)
+}
+
+// How far the camera is along its flight to the ride: 0 (the usual view) .. 1 (riding).
+export const rideState = () => ride;
+
+// Where a stage point (x, y, z) is on the screen as the camera sees it now, in CSS px, with its
+// perspective scale s and whether it's in front of the camera.
+export function toScreen([x, y, z]) {
+  const d = [x - view.eye[0], y - view.eye[1], z - view.eye[2]];
+  const depth = v3.dot(d, view.z), s = view.focal / (radius * Math.max(depth, view.near));
+  return {
+    x: (view.centre[0] + v3.dot(d, view.x) * radius * s) / dpr,
+    y: (view.centre[1] - v3.dot(d, view.y) * radius * s) / dpr,
+    s,
+    front: depth > view.near,
+  };
+}
+
 // ---------- pointer (smoothed so the pull eases in and out) ----------
 
 const pointer = { x: 0, y: 0, tx: 0, ty: 0, active: false, strength: 0 };
@@ -652,12 +767,13 @@ const onCanvas = (e) => ({ x: e.clientX * dpr, y: e.clientY * dpr });
 function listen() {
   addEventListener('pointermove', (e) => {
     setPointer(e);
-    const own = pointer.active && !morph && shown.graphic.over?.(onCanvas(e));
+    const own = pointer.active && !morph && !rideTo && shown.graphic.over?.(onCanvas(e));
     // On the body, since that's what the pointer is over (see setPointer).
-    document.body.style.cursor = pointer.active && (own || overGraphic(e)) ? 'pointer' : '';
+    document.body.style.cursor = pointer.active && !rideTo && (own || overGraphic(e)) ? 'pointer' : '';
   });
   addEventListener('pointerdown', (e) => {
     setPointer(e);
+    if (rideTo || ride > 0) return;
     // A tap on one of the graphic's own targets (like a satellite) is the graphic's alone.
     if (pointer.active && !morph && shown.graphic.tap?.(onCanvas(e))) return;
     if (pointer.active && overGraphic(e) && !morph) shown.graphic.press?.();
@@ -811,18 +927,25 @@ function setShared(config, fade, other = config, k = 0) {
   const mix3 = (key) => config[key].map((v, i) => v + (other[key][i] - v) * k);
   set('uTime', last);
   set('uFade', fade);
-  set('uCenter', [cx, cy]);
+  set('uCenter', view.centre);
+  set('uEye', view.eye);
+  set('uViewX', view.x);
+  set('uViewY', view.y);
+  set('uViewZ', view.z);
+  set('uFocal', view.focal);
+  set('uNear', view.near);
+  set('uMaxSize', view.largest);
+  set('uRide', view.ride);
   set('uResolution', [canvas.width, canvas.height]);
   set('uRadius', radius);
   set('uPointer', [pointer.x * dpr, pointer.y * dpr]);
   set('uPointerStrength', pointer.strength);
-  set('uCamera', mix('cameraDistance'));
   set('uBrightness', mix('brightness') * dim);
   set('uPullRadius', mix('pullRadius'));
   set('uPullStrength', mix('pullStrength'));
   set('uPullGlow', mix('pullGlow'));
   set('uDotSize', mix('dotSize'));
-  set('uSquare', mix('squareSize'));
+  set('uSquare', mix('squareSize') + RIDE.crisp * view.ride);
   set('uBurn', mix('burn'));
   set('uBurnColor', mix3('burnColor'));
   set('uColor', mix3('color'));
@@ -844,6 +967,7 @@ function drawGraphic(layer, fade, t, dt) {
   framing = layer;
   layer.graphic.frame({ t, dt, set, activeCount: activeOf(layer) });
   framing = null;
+  if (ride > 0 && layer.graphic === rideGraphic()) aim(layer.graphic, t);
   setShared(layer.graphic.CONFIG, fade);
   const marked = layer === shown && !morph;
   set('uMarks', marked ? mark.keys : NO_MARKS);
@@ -877,6 +1001,11 @@ function frame(nowMs) {
   // Focus eases at a steady pace (about 0.8 s end to end); place() smooths the ends.
   focus = focusTarget > focus ? Math.min(focusTarget, focus + dt * 1.25) : Math.max(focusTarget, focus - dt * 1.25);
   place();
+  // The camera's flight to the ride or back, at a steady pace (aim() smooths the ends).
+  ride = rideTo > ride ? Math.min(rideTo, ride + dt / RIDE.there) : Math.max(rideTo, ride - dt / RIDE.back);
+  // The page comes back as the camera nears the usual view (html.riding: style.css).
+  if (!rideTo && ride < RIDE.home && document.documentElement.classList.contains('riding')) document.documentElement.classList.remove('riding');
+  aim(rideGraphic(), t);
   // Its sounds are quieter once it has glided aside, out of the way of the text.
   setPresence(1 - 0.55 * recede * (1 - focus));
 
@@ -908,7 +1037,7 @@ function frame(nowMs) {
     // A 100px element, centred on the graphic and scaled to 3.2 radii.
     haloEl.style.transform =
       `translate(${cx / dpr - 50}px, ${cy / dpr - 50}px) scale(${(radius / dpr) * 0.032})`;
-    haloEl.style.opacity = (halo * dim).toFixed(3);
+    haloEl.style.opacity = (halo * dim * (1 - ride)).toFixed(3);
   }
   requestAnimationFrame(frame);
 }
@@ -1102,15 +1231,15 @@ export function markAt(i) {
   const g = shown.graphic, p = g.markAt?.(i, last);
   if (!p) return null;
   const [x, y, z, depth, size] = p, C = g.CONFIG;
-  const s = C.cameraDistance / (C.cameraDistance - z);
-  let sx = cx + x * radius * s, sy = cy - y * radius * s;
+  const at = toScreen([x, y, z]), s = at.s;
+  let sx = at.x * dpr, sy = at.y * dpr;
   const px = pointer.x * dpr - sx, py = pointer.y * dpr - sy;
   const w = 1 - Math.min(1, Math.hypot(px, py) / (radius * C.pullRadius));
   const pull = w * w * (3 - 2 * w) * (0.35 + 0.65 * depth) * pointer.strength * C.pullStrength;
   sx += px * pull;
   sy += py * pull;
-  const sprite = C.dotSize * radius * 2 * s * (0.55 + 0.65 * depth) * size;
-  return { x: sx / dpr, y: sy / dpr, size: (sprite * C.squareSize) / dpr, depth };
+  const sprite = Math.min(C.dotSize * radius * 2 * s * (0.55 + 0.65 * depth) * size, view.largest);
+  return { x: sx / dpr, y: sy / dpr, size: (sprite * C.squareSize) / dpr, depth, front: at.front };
 }
 
 // Where a point x stage units right of the graphic's centre sits across the screen, from -1 (the left

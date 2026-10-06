@@ -10,7 +10,7 @@
 // text, and only while the graphic is in the hero or resting beside the CV: not on a phone's horizon,
 // nor beside a project pane.
 
-import { MARKS, markAt, marks, reducedMotion, setMarks, stage } from './voxel.js';
+import { MARKS, markAt, marks, reducedMotion, rideState, setMarks, stage } from './voxel.js';
 import { play } from './sound.js';
 
 const EVERY = [12, 24];      // seconds between callouts that come on their own (at random in between)
@@ -164,7 +164,7 @@ function graphic() {
 // Whether callouts may show: the graphic in the hero, or resting beside the CV on a wide screen.
 function allowed() {
   const g = graphic();
-  if (document.hidden || g.focus > 0.01 || document.documentElement.classList.contains('focusing')) return false;
+  if (document.hidden || g.focus > 0.01 || document.documentElement.classList.contains('focusing') || rideState() > 0) return false;
   return g.recede < 0.3 || (g.recede > 0.95 && innerWidth >= 1100);
 }
 
