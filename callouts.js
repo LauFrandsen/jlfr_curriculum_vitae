@@ -1,6 +1,7 @@
 // Callouts: now and then a square of the graphic blinks purple, turns purple and grows a little, and
 // a line draws out from it to a small window with one of the CV's skills; and the same on the square
-// the mouse has rested on for two seconds. The square itself changes (the graphic draws it, so it
+// the mouse has rested on for two seconds. The window stays open while the mouse is on it, and a
+// click on it goes to the skill in the CV. The square itself changes (the graphic draws it, so it
 // moves as it does: voxel.js setMark), and the line follows it (marks, markAt); the skills come from
 // the page's chips. The line and window go over the graphic and under the text, and only while the
 // graphic is in the hero or resting beside the CV: not on a phone's horizon, nor beside a project pane.
@@ -23,26 +24,28 @@ const clamp = (x, lo, hi) => Math.min(Math.max(x, lo), hi);
 
 // The CV's skills (its chips, the short ones) and languages, each with its category, so a skill like
 // "Windows" reads right: a chip's own data-category, or the heading of its skill group, or its list's
-// label ("Specialised in", "Technologies"). A skill listed twice takes the category from the skill
-// groups. As [{ kind, skill }].
+// label ("Specialised in"); and where it is in the CV (el), to go to. A skill listed twice takes the
+// category and place from the skill groups; the projects' chips, only shown in a project's pane, are
+// left out. As [{ kind, skill, el }].
 function sayings() {
-  const out = new Map();   // skill → category
+  const out = new Map();   // skill → { kind, el }
   const chips = [...document.querySelectorAll('.skill-group .chips li'), ...document.querySelectorAll('.chips li')];
   for (const li of chips) {
     const skill = li.textContent.trim();
-    if (skill.length > 28 || out.has(skill)) continue;
-    out.set(skill, li.dataset.category
+    if (skill.length > 28 || out.has(skill) || li.closest('.project-more')) continue;
+    const kind = li.dataset.category
       || li.closest('.skill-group')?.querySelector('h3')?.textContent.trim()
       || li.closest('.chips')?.getAttribute('aria-label')
-      || '');
+      || '';
+    out.set(skill, { kind, el: li });
   }
   const languages = document.querySelector('.languages');
   const heading = languages?.previousElementSibling?.textContent.trim() || 'Languages';
   for (const li of languages?.querySelectorAll('li') ?? []) {
     const name = li.querySelector('strong')?.textContent, level = li.querySelector('span')?.textContent;
-    if (name && level) out.set(`${name} · ${level.toLowerCase()}`, heading);
+    if (name && level) out.set(`${name} · ${level.toLowerCase()}`, { kind: heading, el: li });
   }
-  return [...out].map(([skill, kind]) => ({ kind, skill }));
+  return [...out].map(([skill, { kind, el }]) => ({ kind, skill, el }));
 }
 
 // One at a time, each once before any comes round again.
@@ -55,7 +58,7 @@ function saying() {
       [bag[i], bag[j]] = [bag[j], bag[i]];
     }
   }
-  return bag.pop() ?? { kind: '', skill: '' };
+  return bag.pop() ?? { kind: '', skill: '', el: null };
 }
 
 // Writes a saying into a window: its category over the skill.
@@ -70,13 +73,37 @@ function fill(el, { kind, skill }) {
 
 // ---------- the layer ----------
 
+// The window is a button (for the mouse: the skills are in the CV itself, so the layer is hidden from
+// assistive tech and the button left out of the tab order). Resting on it keeps it open; clicking it
+// goes to the skill in the CV.
 const layer = document.createElement('div');
 layer.className = 'callout';
-layer.setAttribute('aria-hidden', 'true');   // the skills are in the CV itself
+layer.setAttribute('aria-hidden', 'true');
 layer.hidden = true;
-layer.innerHTML = '<svg><line></line></svg><span class="callout-box"></span>';
+layer.innerHTML = '<svg><line></line></svg><button class="callout-box" type="button" tabindex="-1"></button>';
 document.getElementById('voxel-canvas')?.after(layer);   // before the text, so the text stays on top
 const line = layer.querySelector('line'), box = layer.querySelector('.callout-box');
+
+box.addEventListener('pointerenter', () => { if (current) current.held = true; });
+box.addEventListener('pointerleave', () => {
+  if (!current) return;
+  current.held = false;
+  current.left = performance.now();
+});
+box.addEventListener('click', () => {
+  const c = current;
+  if (!c || c.ending) return;
+  c.ending = performance.now();
+  goTo(c.said.el);
+});
+
+// Scrolls to a skill in the CV and picks it out in the callouts' colour for a moment.
+function goTo(el) {
+  if (!el) return;
+  el.scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'center' });
+  el.classList.add('found');
+  setTimeout(() => el.classList.remove('found'), 2600);
+}
 
 // A hidden copy of the window, to measure one before it shows.
 const ruler = document.createElement('span');
@@ -128,7 +155,10 @@ function place(m, g, w, h) {
 
 // ---------- showing one ----------
 
-let current = null;   // the callout showing: { index, start, mouse, size, at, ending, away, gone }
+// The callout showing: { index, said, start, mouse (called by the mouse resting), size (its window's),
+// at (where its square was last), ending, away (since when the mouse has been away from its square),
+// gone (its square is), held (the mouse is on its window), left (when the mouse last left it) }.
+let current = null;
 let looping = false;
 
 function show(index, said, mouse = false) {
@@ -136,7 +166,7 @@ function show(index, said, mouse = false) {
   if (!at) return;
   const now = performance.now();
   fill(box, said);
-  current = { index, start: reducedMotion.matches ? now - STEP.open : now, mouse, size: measure(said), at, ending: 0, away: 0 };
+  current = { index, said, start: reducedMotion.matches ? now - STEP.open : now, mouse, size: measure(said), at, ending: 0, away: 0, held: false, left: 0 };
   layer.hidden = false;
   play('callout', { pan: (at.x / innerWidth) * 2 - 1 });
   if (!looping) {
@@ -152,13 +182,15 @@ function tick(now) {
   if (c && !c.ending) {
     if (!m || !allowed()) {
       c.ending = now;   // its square is gone, or the graphic has moved on
+    } else if (c.held) {
+      c.away = 0;       // the mouse is on its window: it stays open
     } else if (c.mouse) {
       // Called by the mouse: stays while the mouse rests near it, and goes a moment after it leaves.
       const near = mouse.on && Math.hypot(mouse.x - m.x, mouse.y - m.y) < 40;
       c.away = near ? 0 : c.away || now;
       if (c.away && now - c.away > 900) c.ending = now;
-    } else if (now - c.start > STEP.open + HOLD_MS) {
-      c.ending = now;
+    } else if (now > Math.max(c.start + STEP.open + HOLD_MS, c.left + 1200)) {
+      c.ending = now;   // its time is up, and the mouse left its window a moment ago (if it was on it)
     }
   }
   const out = c?.ending ? (now - c.ending) / STEP.out : 0;
@@ -191,6 +223,7 @@ function tick(now) {
   line.setAttribute('y2', sy + (ty - sy) * drawn);
   const opened = ease((e - STEP.line) / (STEP.open - STEP.line)) * fade;
   box.style.opacity = String(opened);
+  box.style.pointerEvents = opened > 0.5 && !c.ending ? 'auto' : 'none';
   box.style.transform = `translate(${left}px, ${top + (1 - opened) * 4}px)`;
   requestAnimationFrame(tick);
 }
