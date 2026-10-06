@@ -58,6 +58,8 @@ const PHASE = {
 const NEVER = 1e9;            // a time that never comes: squares that never let go
 const GROUND = -0.66;         // the soil's surface (stage units; the shader has the same)
 const SOIL_DEPTH = 0.34;
+const GROUND_NEAR = 1.1;      // the ground is full out to this far each side of the stem (stage units),
+const GROUND_FAR = 5;         // and thins out beyond it as far as this (what's seen of it: groundReach)
 const FOOT = -0.08;           // the stem starts this far below the ground, in stem heights
 const HEAD_RADIUS = 0.09;
 const HEAD_SQUARES = 110;
@@ -75,6 +77,7 @@ attribute vec3 aInfo;     // x = part; y = stem height it branches off at (petal
 uniform float uGrow, uFlight, uGravity, uFallSeconds;
 uniform vec4 uStem;       // stem height, bend, bend phase, lean
 uniform float uPitch, uSway, uSwaySpeed, uGust;
+uniform vec2 uGround;     // how far the ground is seen to the left and to the right of the stem
 
 const float GROUND = ${GROUND.toFixed(3)};
 const float FOOT = ${FOOT.toFixed(3)};
@@ -102,25 +105,34 @@ vec3 view(vec3 p) {
   return vec3(p.x, GROUND + y * c - p.z * s, y * s + p.z * c);
 }
 
-// Which side of the screen a square comes in from: either, with the flower in the middle; the
-// nearer side with the flower off to one side (beside the CV), so squares never cross the text.
-float sideOf(float r) {
+// How strongly the ground shows at x: full near the flower, fading out to how far it's seen that side.
+float groundFade(float x) {
+  return 1.0 - smoothstep(0.6, x < 0.0 ? uGround.x : uGround.y, abs(x));
+}
+
+// Which side of the screen a square comes in from (-1 left, 1 right): either, with the flower in the
+// middle; the nearer side with the flower off to one side (beside the CV), so squares never cross the
+// text. A square of the ground (x: where it lies; 0 for the rest) comes in on its own side while the
+// flower is in the middle, so it never has to cross under the flower.
+float sideOf(float r, float x) {
   float leftShare = 1.0 - smoothstep(0.38, 0.62, uCenter.x / uResolution.x);
+  if (x != 0.0 && abs(leftShare - 0.5) < 0.25) return sign(x);
   return fract(r * 13.7) < leftShare ? -1.0 : 1.0;
 }
 
-// Where a square enters the soil: at the soil's end on its side, somewhere in its depth.
-vec3 entry(float r) {
-  return vec3(sideOf(r) * (0.78 + 0.25 * fract(r * 17.3)), GROUND - 0.03 - 0.22 * fract(r * 4.9),
-              (fract(r * 8.3) - 0.5) * 0.5);
+// Where a square enters the soil: near the end of its middle part on its side, somewhere in its depth;
+// a square of the ground lying further out on that side enters right below its place.
+vec3 entry(float side, float r, float x) {
+  float out1 = 0.78 + 0.25 * fract(r * 17.3);
+  if (x * side > out1) out1 = abs(x);
+  return vec3(side * out1, GROUND - 0.03 - 0.22 * fract(r * 4.9), (fract(r * 8.3) - 0.5) * 0.5);
 }
 
-// A square's way in on screen (device px) at progress p, ending where it enters the soil (at). It
-// sets off just off its side edge, anywhere from a little above the ground to below the bottom of the
-// screen, runs along the edge and turns in at the ground's height, so it never crosses the text in
-// the middle of the screen.
-vec2 wayIn(float p, float r, vec2 at) {
-  float side = sideOf(r);
+// A square's way in on screen (device px) at progress p, from its side, ending where it enters the
+// soil (at). It sets off just off its side edge, anywhere from a little above the ground to below the
+// bottom of the screen, runs along the edge and turns in at the ground's height, so it never crosses
+// the text in the middle of the screen.
+vec2 wayIn(float p, float side, float r, vec2 at) {
   float margin = uDotSize * uRadius * 2.0;
   float edge = side < 0.0 ? -margin : uResolution.x + margin;
   vec2 from = vec2(edge, mix(at.y - uRadius * 0.9, uResolution.y + uRadius * 0.3, fract(r * 23.1)));
@@ -178,10 +190,11 @@ void main() {
       float u = (t - ta + flight) / flight;
       float q = fallCurve(u, uGravity, uLanding);
       fade = smoothstep(0.0, 0.06, u);
-      vec3 e = entry(r);
+      float x = part < 0.5 ? aTarget.x : 0.0, side = sideOf(r, x);
+      vec3 e = entry(side, r, x);
       if (q < SCREEN_SHARE) {
         float es;
-        start = wayIn(q / SCREEN_SHARE, r, project(view(e), es));
+        start = wayIn(q / SCREEN_SHARE, side, r, project(view(e), es));
         screenMix = 0.0;
         pos = e;
       } else {
@@ -203,8 +216,9 @@ void main() {
           + (vec3(r, fract(r * 5.3), fract(r * 9.1)) - 0.5) * 0.02 * v;
       fade = 1.0 - smoothstep(0.35, 1.0, v);
     }
-    // The soil fades toward its edges; stem and head a little darker than petals and leaves.
-    ink *= part < 0.5 ? aInfo.y : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
+    // The ground fades out to the sides, as far as it's seen; stem and head a little darker than
+    // petals and leaves.
+    ink *= part < 0.5 ? aInfo.y * groundFade(aTarget.x) : part < 1.5 ? 0.95 : part < 2.5 ? 1.2 : part < 3.5 ? 1.05 : part < 4.5 ? 1.15 : 1.0;
   }
 
   vec3 p = view(sway(pos));
@@ -259,24 +273,32 @@ function square(p, land, letGo, part, info) {
   return [p[0], p[1], p[2], land, letGo, part, info, Math.random()];
 }
 
-// The soil: a jittered grid of squares on its surface, so the ground reads as a field receding into
-// the page, over looser soil that thins out with depth, all of it fading out toward the ends. It forms
-// from the middle outward. The CV entries' squares land on its surface around the stem.
+// The ground: a jittered grid of squares on its surface, so it reads as a field receding into the
+// page, over looser soil that thins out with depth. It's full out to GROUND_NEAR each side of the stem
+// and thins out beyond, a square there kept with a chance of GROUND_NEAR / its distance, as far as
+// GROUND_FAR; the shader fades it out as far as it's seen (groundReach), so it carries on to the
+// screen's edges. It forms from the middle outward. The CV entries' squares land on its surface around
+// the stem.
 function makeSoil() {
   const w = [Math.random() * 6, Math.random() * 6, Math.random() * 6];
   const surface = (x, z) => GROUND + 0.012 * Math.sin(x * 5 + w[0]) + 0.008 * Math.sin(x * 13 + w[1]) + 0.006 * Math.sin(z * 9 + w[2]);
   const squares = [];
-  const add = (x, z, depth) => {
-    const ink = (1 - smooth(0.62, 1.08, Math.abs(x))) * (1 - smooth(0.26, 0.42, Math.abs(z))) * Math.exp(-depth / 0.16);
-    if (ink < 0.04) return;
-    const order = 0.55 * Math.abs(x) / 1.08 + 0.45 * Math.random();
+  const add = (x, z, depth, thin = true) => {
+    const ink = (1 - smooth(0.26, 0.42, Math.abs(z))) * Math.exp(-depth / 0.16);
+    if (ink < 0.04 || (thin && Math.abs(x) > GROUND_NEAR && Math.random() > GROUND_NEAR / Math.abs(x))) return;
+    const order = (0.55 * Math.abs(x)) / (Math.abs(x) + 0.6) + 0.45 * Math.random();
     squares.push(square([x, surface(x, z) - depth, z], lerp(...PHASE.ground, order), 0, SOIL, ink * 0.65));
   };
-  for (let x = -1.08; x <= 1.08; x += 0.04) {
+  for (let x = -GROUND_FAR; x <= GROUND_FAR; x += 0.04) {
     for (let z = -0.42; z <= 0.42; z += 0.04) add(x + (Math.random() - 0.5) * 0.016, z + (Math.random() - 0.5) * 0.016, Math.random() * 0.01);
   }
-  for (let i = 0; i < CONFIG.soilCount; i++) {
-    add((Math.random() * 2 - 1) * 1.08, (Math.random() * 2 - 1) * 0.42, 0.012 + Math.min(SOIL_DEPTH, -Math.log(1 - Math.random() * 0.97) * 0.08));
+  // Below the surface: soilCount squares under its full part, and half as many again thinning out
+  // beyond it (spread as one over the distance, like the surface).
+  const below = () => 0.012 + Math.min(SOIL_DEPTH, -Math.log(1 - Math.random() * 0.97) * 0.08);
+  for (let i = 0; i < CONFIG.soilCount; i++) add((Math.random() * 2 - 1) * GROUND_NEAR, (Math.random() * 2 - 1) * 0.42, below());
+  for (let i = 0; i < CONFIG.soilCount / 2; i++) {
+    const x = GROUND_NEAR * (GROUND_FAR / GROUND_NEAR) ** Math.random() * (Math.random() < 0.5 ? -1 : 1);
+    add(x, (Math.random() * 2 - 1) * 0.42, below(), false);
   }
   const story = [];
   for (let i = 0; i < STORY_TOTAL; i++) {
@@ -565,10 +587,10 @@ function frame({ t, dt, set }) {
   lastT = t;
   for (const p of petals) {
     // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb
-    // the stem, with a low hum for as long as they come in and build it.
+    // the stem, heard coming in from the side(s) they come from and humming as they build it.
     if (time >= p.next) {
       grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
-      play('sweep', { pan: panOf(), length: 1.25 * CONFIG.flightSeconds + CONFIG.petalRegrowSeconds });
+      play('sweep', { pan: panOf(), length: 1.25 * CONFIG.flightSeconds + CONFIG.petalRegrowSeconds, from: 1 - 2 * leftShare() });
     }
   }
   // Once the flower is whole, a petal breaks after a pause, and now and then a second follows it.
@@ -593,12 +615,36 @@ function frame({ t, dt, set }) {
   set('uFallSeconds', Math.max(0.2, CONFIG.petalFallSeconds));
   set('uStem', [shape.height, shape.bend, shape.phase, shape.lean]);
   set('uPitch', CONFIG.pitch);
+  reachGround();
+  set('uGround', groundReach);
   set('uSway', still ? 0 : CONFIG.sway);
   set('uSwaySpeed', CONFIG.swaySpeed);
   set('uGust', gust);
 }
 
 // ---------- where things are, as the shader draws them ----------
+
+// The share of squares that come in from the left of the screen (as the shader's sideOf has it):
+// half with the flower in the middle, all of them from the nearer side with it off to one side.
+function leftShare() {
+  const st = stage();
+  return 1 - smooth(0.38, 0.62, st.x / Math.max(st.width, 1));
+}
+
+// How far the ground is seen to the left and to the right of the stem (stage units): a third past the
+// screen's edge, so it seems to carry on beyond it; but beside the CV (the flower off to one side),
+// toward the text it ends close to the flower. The shader's groundFade fades it out to there.
+const groundReach = [GROUND_NEAR, GROUND_NEAR];
+function reachGround() {
+  const st = stage(), r = Math.max(st.radius, 1), left = leftShare();
+  const open = (edge, toward) => {
+    const far = Math.min(GROUND_FAR, Math.max(GROUND_NEAR, (edge / r) * 1.35));
+    return GROUND_NEAR + (far - GROUND_NEAR) * Math.min(1, 2 * toward);
+  };
+  groundReach[0] = open(st.x, left);
+  groundReach[1] = open(st.width - st.x, 1 - left);
+}
+const groundFade = (x) => 1 - smooth(0.6, groundReach[x < 0 ? 0 : 1], Math.abs(x));
 
 const PART_INK = [0, 0.95, 1.2, 1.05, 1.15, 1, 1];   // by part, as in the shader (soil has its own)
 
@@ -623,13 +669,14 @@ function inView([x0, y0, z0], [dx, dz]) {
 function pose(t) {
   const out = [];
   const wind = windAt(t);
+  reachGround();
   for (const [x0, y0, z0, land, letGo, part, info] of squares) {
     const visible = part === STORY ? storyLanded(Math.floor(info / STORY_DOTS))
       : part === PETAL ? time >= petals[info].start + land * petals[info].build && time < petals[info].fall + letGo
-      : time >= land * CONFIG.growSeconds;
+      : time >= land * CONFIG.growSeconds && (part !== SOIL || groundFade(x0) > 0.02);
     if (!visible) continue;
     const [x, y, vz] = inView([x0, y0, z0], wind);
-    out.push(x, y, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info : PART_INK[part], 1, 0);
+    out.push(x, y, vz, Math.min(1, Math.max(0, 0.55 + vz * 0.9)), part === SOIL ? info * groundFade(x0) : PART_INK[part], 1, 0);
   }
   return new Float32Array(out);
 }

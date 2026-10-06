@@ -7,8 +7,9 @@
 // once it's on.
 //
 // play(name, options) plays one of SOUNDS. Options: at (seconds from now), pan (-1 left .. 1 right),
-// gain (multiplies its loudness), pitch (multiplies its frequencies) and length (seconds, for an effect
-// that lasts as long as what it goes with, like a rocket's climb).
+// gain (multiplies its loudness), pitch (multiplies its frequencies), length (seconds, for an effect
+// that lasts as long as what it goes with, like a rocket's climb) and from (for one that moves: which
+// side it comes in from, -1 left .. 1 right, 0 both).
 
 // Tunable (the ?tune panel): overall volume, the music's level, and how much of the effects comes back
 // from the room.
@@ -88,7 +89,7 @@ function hum(s, { at = 0, freqs, cutoff = 400, to, glide, q = 0.7, attack = 0.2,
 }
 
 // A breath of noise through a filter at freq, sweeping to `to` over `glide`.
-function hiss(s, { at = 0, filter = 'lowpass', freq, to, glide, q = 0.7, attack = 0.01, decay = 0.2, gain = 0.1 }) {
+function hiss(s, { at = 0, filter = 'lowpass', freq, to, glide, q = 0.7, attack = 0.01, decay = 0.2, gain = 0.1, smooth = false }) {
   const t = s.t + at, src = s.ctx.createBufferSource(), f = s.ctx.createBiquadFilter(), g = s.ctx.createGain();
   src.buffer = s.noise;
   src.loop = true;
@@ -96,7 +97,7 @@ function hiss(s, { at = 0, filter = 'lowpass', freq, to, glide, q = 0.7, attack 
   f.Q.value = q;
   f.frequency.setValueAtTime(freq * s.pitch, t);
   if (to) f.frequency.exponentialRampToValueAtTime(to * s.pitch, t + (glide ?? attack + decay));
-  shape(g.gain, t, gain, attack, decay);
+  shape(g.gain, t, gain, attack, decay, 0, smooth);
   src.connect(f).connect(g).connect(s.out);
   src.start(t, Math.random() * 1.5);
   src.stop(t + attack + decay + 0.05);
@@ -247,13 +248,32 @@ export const SOUNDS = {
     hiss(s, { filter: 'bandpass', freq: 900, attack: 0.001, decay: 0.03, gain: 0.05 }),
     hiss(s, { at: 0.05, freq: 500, to: 160, attack: 0.05, decay: 0.4, gain: 0.05 }),
   ),
-  // New squares coming in to rebuild a petal (for `length`: their way in and the petal's build): a
-  // low hum that fades in slowly, holds while they come, warming a little, and fades away.
+  // New squares coming in from the side to rebuild a petal (`length`: their way in and the petal's
+  // build; `from`: -1 the left, 1 the right, 0 both sides): from each side they come from, a low rush
+  // and hum that swell and brighten as they near, moving in toward the middle; then, as they arrive,
+  // a fuller hum in the middle that holds while they climb the stem and build the petal, and eases away.
   sweep: (s) => {
-    const hold = Math.max(0, (s.length ?? 8.5) - 5.2);
-    return Math.max(
-      hum(s, { freqs: [82.41, 110], cutoff: 160, to: 300, glide: hold + 2.2, attack: 2.2, hold, decay: 3, gain: 0.011, smooth: true }),
-      tone(s, { freq: 55, attack: 2.2, hold, decay: 3, gain: 0.04, smooth: true }),
+    const l = s.length ?? 8.5, near = l * 0.55, from = s.from ?? 0;
+    let end = 0;
+    for (const side of [-1, 1]) {
+      const share = (1 + side * from) / 2;
+      if (share < 0.05) continue;
+      const move = s.ctx.createStereoPanner ? s.ctx.createStereoPanner() : s.ctx.createGain();
+      if (move.pan) {
+        move.pan.setValueAtTime(side * 0.9, s.t);
+        move.pan.linearRampToValueAtTime(side * 0.1, s.t + near);
+      }
+      move.connect(s.out);
+      const fromSide = { ...s, out: move };
+      end = Math.max(end,
+        hiss(fromSide, { freq: 110, to: 560, glide: near, attack: near * 0.85, decay: 1.8, gain: 0.3 * share, smooth: true }),
+        hum(fromSide, { freqs: [55, 82.41], cutoff: 140, to: 480, glide: near, attack: near * 0.8, decay: 1.6, gain: 0.03 * share, smooth: true }),
+      );
+    }
+    const arrive = near - 1.2, hold = Math.max(0, l - arrive - 1.5 - 1);
+    return Math.max(end,
+      hum(s, { at: arrive, freqs: [82.41, 110], cutoff: 200, to: 420, glide: 3, attack: 1.5, hold, decay: 2.5, gain: 0.02, smooth: true }),
+      tone(s, { at: arrive, freq: 55, attack: 1.5, hold, decay: 2.5, gain: 0.07, smooth: true }),
     );
   },
   // Pressing the flower, which sends a gust through it.
@@ -566,7 +586,7 @@ export function setPresence(k) {
 }
 
 // Plays effect `name` (see the top of this file for the options), if sound is on and running.
-export function play(name, { at = 0, pan = 0, gain = 1, pitch = 1, length } = {}) {
+export function play(name, { at = 0, pan = 0, gain = 1, pitch = 1, length, from } = {}) {
   const make = SOUNDS[name];
   if (!on || !make || ctx?.state !== 'running' || document.hidden || voices >= MAX_VOICES) return;
   const out = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
@@ -575,7 +595,7 @@ export function play(name, { at = 0, pan = 0, gain = 1, pitch = 1, length } = {}
   level.gain.value = gain;
   out.connect(level).connect(mix);
   const t = ctx.currentTime + Math.max(0, at);
-  const lasts = make({ ctx, out, t, pitch, noise, length });
+  const lasts = make({ ctx, out, t, pitch, noise, length, from });
   voices++;
   setTimeout(() => {
     voices--;
