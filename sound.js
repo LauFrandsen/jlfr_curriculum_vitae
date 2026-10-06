@@ -9,7 +9,8 @@
 // play(name, options) plays one of SOUNDS. Options: at (seconds from now), pan (-1 left .. 1 right),
 // gain (multiplies its loudness), pitch (multiplies its frequencies), length (seconds, for an effect
 // that lasts as long as what it goes with, like a rocket's climb) and from (for one that moves: which
-// side it comes in from, -1 left .. 1 right, 0 both).
+// side it comes in from, -1 left .. 1 right, 0 both). It returns a handle to let go of an effect that
+// holds until something is over.
 
 // Tunable (the ?tune panel): overall volume, the music's level, and how much of the effects comes back
 // from the room.
@@ -34,7 +35,8 @@ let music = null;          // the music, once it has started
 // ---------- the instruments ----------
 // Effects are built from these, given s = { ctx, out, t, pitch, noise, length }: the context, where it
 // goes, when it starts, its pitch, the noise and how long it lasts (if it follows something). Each
-// returns how long it sounds, in seconds from s.t.
+// returns how long it sounds, in seconds from s.t; an effect that holds until it's let go returns
+// { lasts (at the most), release() (lets it go, and returns how long it takes to die away) }.
 
 // Rises to peak over attack, holds there for `hold`, then dies away over decay. Smooth: rises evenly
 // and eases away instead (for long, held sounds, so they swell rather than surge).
@@ -89,19 +91,30 @@ function hum(s, { at = 0, freqs, cutoff = 400, to, glide, q = 0.7, attack = 0.2,
 }
 
 // A breath of noise through a filter at freq, sweeping to `to` over `glide`.
-function hiss(s, { at = 0, filter = 'lowpass', freq, to, glide, q = 0.7, attack = 0.01, decay = 0.2, gain = 0.1, smooth = false }) {
-  const t = s.t + at, src = s.ctx.createBufferSource(), f = s.ctx.createBiquadFilter(), g = s.ctx.createGain();
+function hiss(s, { at = 0, filter = 'lowpass', freq, to, glide, q = 0.7, attack = 0.01, hold = 0, decay = 0.2, gain = 0.1, smooth = false }) {
+  const t = s.t + at, src = s.ctx.createBufferSource(), f = s.ctx.createBiquadFilter(), g = s.ctx.createGain(), end = attack + hold + decay;
   src.buffer = s.noise;
   src.loop = true;
   f.type = filter;
   f.Q.value = q;
   f.frequency.setValueAtTime(freq * s.pitch, t);
-  if (to) f.frequency.exponentialRampToValueAtTime(to * s.pitch, t + (glide ?? attack + decay));
-  shape(g.gain, t, gain, attack, decay, 0, smooth);
+  if (to) f.frequency.exponentialRampToValueAtTime(to * s.pitch, t + (glide ?? end));
+  shape(g.gain, t, gain, attack, decay, hold, smooth);
   src.connect(f).connect(g).connect(s.out);
   src.start(t, Math.random() * 1.5);
-  src.stop(t + attack + decay + 0.05);
-  return at + attack + decay;
+  src.stop(t + end + 0.05);
+  return at + end;
+}
+
+// Stops param's planned changes at time `now`, keeping it where it is then.
+function freeze(param, now) {
+  if (param.cancelAndHoldAtTime) {
+    param.cancelAndHoldAtTime(now);
+  } else {
+    const v = param.value;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(v, now);
+  }
 }
 
 // Noise whose filter wanders: `path` is [[seconds, freq], ...] for the filter, and `level` the same
@@ -248,33 +261,46 @@ export const SOUNDS = {
     hiss(s, { filter: 'bandpass', freq: 900, attack: 0.001, decay: 0.03, gain: 0.05 }),
     hiss(s, { at: 0.05, freq: 500, to: 160, attack: 0.05, decay: 0.4, gain: 0.05 }),
   ),
-  // New squares coming in from the side to rebuild a petal (`length`: their way in and the petal's
-  // build; `from`: -1 the left, 1 the right, 0 both sides): from each side they come from, a low rush
-  // and hum that swell and brighten as they near, moving in toward the middle; then, as they arrive,
-  // a fuller hum in the middle that holds while they climb the stem and build the petal, and eases away.
+  // New squares coming in from the side to rebuild a petal (`from`: -1 the left, 1 the right, 0 both
+  // sides; `length`: how long that should take at most). From each side they come from, a low rush and
+  // hum swell and brighten as they near over `approach`, moving in toward the middle, and a fuller
+  // hum gathers in the middle as they arrive. It all holds until it's let go (the flower lets go when
+  // the last square has landed), then eases away; it lets itself go after `length` at the latest.
   sweep: (s) => {
-    const l = s.length ?? 8.5, near = l * 0.55, from = s.from ?? 0;
-    let end = 0;
+    const approach = 4, from = s.from ?? 0, most = (s.length ?? 12) + 4;
+    const level = s.ctx.createGain();
+    level.gain.setValueAtTime(1, s.t);
+    level.gain.setValueAtTime(1, s.t + most);
+    level.gain.linearRampToValueAtTime(0.0001, s.t + most + 2);
+    level.connect(s.out);
+    const all = { ...s, out: level };
     for (const side of [-1, 1]) {
       const share = (1 + side * from) / 2;
       if (share < 0.05) continue;
       const move = s.ctx.createStereoPanner ? s.ctx.createStereoPanner() : s.ctx.createGain();
       if (move.pan) {
         move.pan.setValueAtTime(side * 0.9, s.t);
-        move.pan.linearRampToValueAtTime(side * 0.1, s.t + near);
+        move.pan.linearRampToValueAtTime(side * 0.15, s.t + approach);
       }
-      move.connect(s.out);
+      move.connect(level);
       const fromSide = { ...s, out: move };
-      end = Math.max(end,
-        hiss(fromSide, { freq: 110, to: 560, glide: near, attack: near * 0.85, decay: 1.8, gain: 0.3 * share, smooth: true }),
-        hum(fromSide, { freqs: [55, 82.41], cutoff: 140, to: 480, glide: near, attack: near * 0.8, decay: 1.6, gain: 0.03 * share, smooth: true }),
-      );
+      hiss(fromSide, { freq: 110, to: 560, glide: approach, attack: approach * 0.85, hold: most, decay: 2, gain: 0.28 * share, smooth: true });
+      hum(fromSide, { freqs: [55, 82.41], cutoff: 140, to: 480, glide: approach, attack: approach * 0.8, hold: most, decay: 2, gain: 0.03 * share, smooth: true });
     }
-    const arrive = near - 1.2, hold = Math.max(0, l - arrive - 1.5 - 1);
-    return Math.max(end,
-      hum(s, { at: arrive, freqs: [82.41, 110], cutoff: 200, to: 420, glide: 3, attack: 1.5, hold, decay: 2.5, gain: 0.02, smooth: true }),
-      tone(s, { at: arrive, freq: 55, attack: 1.5, hold, decay: 2.5, gain: 0.07, smooth: true }),
-    );
+    const arrive = approach - 1.2;
+    hum(all, { at: arrive, freqs: [82.41, 110], cutoff: 200, to: 420, glide: 3, attack: 1.5, hold: most, decay: 2, gain: 0.03, smooth: true });
+    tone(all, { at: arrive, freq: 55, attack: 1.5, hold: most, decay: 2, gain: 0.09, smooth: true });
+    hiss(all, { at: arrive, freq: 300, attack: 1.5, hold: most, decay: 2, gain: 0.1, smooth: true });
+    return {
+      lasts: most + 2,
+      // Let go: it all eases away over two or three seconds.
+      release: () => {
+        const now = s.ctx.currentTime;
+        freeze(level.gain, now);
+        level.gain.setTargetAtTime(0.0001, now, 0.8);
+        return 3.5;
+      },
+    };
   },
   // Pressing the flower, which sends a gust through it.
   gust: (s) => Math.max(
@@ -585,20 +611,37 @@ export function setPresence(k) {
   if (on) levels();
 }
 
+const SILENT = { release() {} };
+
 // Plays effect `name` (see the top of this file for the options), if sound is on and running.
+// Returns a handle whose release() lets go of an effect that holds until then (like `sweep`); for the
+// rest, and when nothing played, it does nothing.
 export function play(name, { at = 0, pan = 0, gain = 1, pitch = 1, length, from } = {}) {
   const make = SOUNDS[name];
-  if (!on || !make || ctx?.state !== 'running' || document.hidden || voices >= MAX_VOICES) return;
+  if (!on || !make || ctx?.state !== 'running' || document.hidden || voices >= MAX_VOICES) return SILENT;
   const out = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
   if (out.pan) out.pan.value = Math.max(-1, Math.min(1, pan)) * 0.7;
   const level = ctx.createGain();
   level.gain.value = gain;
   out.connect(level).connect(mix);
   const t = ctx.currentTime + Math.max(0, at);
-  const lasts = make({ ctx, out, t, pitch, noise, length, from });
+  const made = make({ ctx, out, t, pitch, noise, length, from });
+  const held = typeof made === 'object';
   voices++;
-  setTimeout(() => {
+  let ended = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
     voices--;
     level.disconnect();
-  }, (Math.max(0, at) + lasts + 0.3) * 1000);
+  };
+  let timer = setTimeout(end, (Math.max(0, at) + (held ? made.lasts : made) + 0.3) * 1000);
+  if (!held) return SILENT;
+  return {
+    release() {
+      if (ended) return;
+      clearTimeout(timer);
+      timer = setTimeout(end, (made.release() + 0.3) * 1000);
+    },
+  };
 }

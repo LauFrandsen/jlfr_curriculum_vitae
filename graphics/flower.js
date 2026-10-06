@@ -587,10 +587,16 @@ function frame({ t, dt, set }) {
   lastT = t;
   for (const p of petals) {
     // A new petal: new squares set off now (the slowest flights take 1.25 of the average) and climb
-    // the stem, heard coming in from the side(s) they come from and humming as they build it.
+    // the stem, heard coming in from the side(s) they come from and humming until the last one has
+    // landed and the petal is whole.
     if (time >= p.next) {
       grow(p, time + 1.25 * CONFIG.flightSeconds, CONFIG.petalRegrowSeconds);
-      play('sweep', { pan: panOf(), length: 1.25 * CONFIG.flightSeconds + CONFIG.petalRegrowSeconds, from: 1 - 2 * leftShare() });
+      p.hum?.release();
+      p.hum = play('sweep', { pan: panOf(), length: 1.25 * CONFIG.flightSeconds + CONFIG.petalRegrowSeconds, from: 1 - 2 * leftShare() });
+    }
+    if (p.hum && whole(p)) {
+      p.hum.release();
+      p.hum = null;
     }
   }
   // Once the flower is whole, a petal breaks after a pause, and now and then a second follows it.

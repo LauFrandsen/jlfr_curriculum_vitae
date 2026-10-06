@@ -181,16 +181,21 @@ function open(graphic) {
   body.append(listen);
   const playButton = document.createElement('button');
   playButton.textContent = 'Play';
+  // An effect that holds until it's let go (like `sweep`) is let go after 8 seconds here.
+  const listenTo = (name) => {
+    const held = play(name);
+    setTimeout(() => held.release(), 8000);
+  };
   playButton.addEventListener('click', () => {
     if (soundOn()) {
-      play(pick.value);
+      listenTo(pick.value);
       return;
     }
     // Turns sound on first (as the page's sound button does), then plays it.
     setSound(true);
     const pageButton = document.getElementById('sound-button');
     pageButton?.setAttribute('aria-pressed', 'true');
-    setTimeout(() => play(pick.value), 400);
+    setTimeout(() => listenTo(pick.value), 400);
   });
   listen.append(playButton);
 
