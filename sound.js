@@ -35,35 +35,43 @@ let music = null;          // the music, once it has started
 // goes, when it starts, its pitch, the noise and how long it lasts (if it follows something). Each
 // returns how long it sounds, in seconds from s.t.
 
-// Rises to peak over attack, then dies away over decay.
-function shape(param, t, peak, attack, decay) {
+// Rises to peak over attack, holds there for `hold`, then dies away over decay. Smooth: rises evenly
+// and eases away instead (for long, held sounds, so they swell rather than surge).
+function shape(param, t, peak, attack, decay, hold = 0, smooth = false) {
+  const top = Math.max(peak, 0.0002);
   param.setValueAtTime(0.0001, t);
-  param.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + attack);
-  param.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+  if (smooth) {
+    param.linearRampToValueAtTime(top, t + attack);
+    param.setTargetAtTime(0.0001, t + attack + hold, decay / 4);
+    return;
+  }
+  param.exponentialRampToValueAtTime(top, t + attack);
+  if (hold > 0) param.setValueAtTime(top, t + attack + hold);
+  param.exponentialRampToValueAtTime(0.0001, t + attack + hold + decay);
 }
 
 // A tone: an oscillator at freq, gliding to `to` over `glide` (default: all of it).
-function tone(s, { at = 0, type = 'sine', freq, to, glide, attack = 0.01, decay = 0.2, gain = 0.1 }) {
-  const t = s.t + at, o = s.ctx.createOscillator(), g = s.ctx.createGain();
+function tone(s, { at = 0, type = 'sine', freq, to, glide, attack = 0.01, hold = 0, decay = 0.2, gain = 0.1, smooth = false }) {
+  const t = s.t + at, o = s.ctx.createOscillator(), g = s.ctx.createGain(), end = attack + hold + decay;
   o.type = type;
   o.frequency.setValueAtTime(freq * s.pitch, t);
-  if (to) o.frequency.exponentialRampToValueAtTime(to * s.pitch, t + (glide ?? attack + decay));
-  shape(g.gain, t, gain, attack, decay);
+  if (to) o.frequency.exponentialRampToValueAtTime(to * s.pitch, t + (glide ?? end));
+  shape(g.gain, t, gain, attack, decay, hold, smooth);
   o.connect(g).connect(s.out);
   o.start(t);
-  o.stop(t + attack + decay + 0.05);
-  return at + attack + decay;
+  o.stop(t + end + 0.05);
+  return at + end;
 }
 
 // A hum: a low chord, two slightly detuned sawtooth oscillators per note, through a lowpass that
 // opens from cutoff to `to` over `glide`.
-function hum(s, { at = 0, freqs, cutoff = 400, to, glide, q = 0.7, attack = 0.2, decay = 1, gain = 0.05 }) {
-  const t = s.t + at, f = s.ctx.createBiquadFilter(), g = s.ctx.createGain();
+function hum(s, { at = 0, freqs, cutoff = 400, to, glide, q = 0.7, attack = 0.2, hold = 0, decay = 1, gain = 0.05, smooth = false }) {
+  const t = s.t + at, f = s.ctx.createBiquadFilter(), g = s.ctx.createGain(), end = attack + hold + decay;
   f.type = 'lowpass';
   f.Q.value = q;
   f.frequency.setValueAtTime(cutoff, t);
-  if (to) f.frequency.exponentialRampToValueAtTime(to, t + (glide ?? attack + decay));
-  shape(g.gain, t, gain, attack, decay);
+  if (to) f.frequency.exponentialRampToValueAtTime(to, t + (glide ?? end));
+  shape(g.gain, t, gain, attack, decay, hold, smooth);
   f.connect(g).connect(s.out);
   for (const freq of freqs) {
     for (const cents of [-6, 6]) {
@@ -73,10 +81,10 @@ function hum(s, { at = 0, freqs, cutoff = 400, to, glide, q = 0.7, attack = 0.2,
       o.detune.value = cents;
       o.connect(f);
       o.start(t);
-      o.stop(t + attack + decay + 0.05);
+      o.stop(t + end + 0.05);
     }
   }
-  return at + attack + decay;
+  return at + end;
 }
 
 // A breath of noise through a filter at freq, sweeping to `to` over `glide`.
@@ -239,12 +247,15 @@ export const SOUNDS = {
     hiss(s, { filter: 'bandpass', freq: 900, attack: 0.001, decay: 0.03, gain: 0.05 }),
     hiss(s, { at: 0.05, freq: 500, to: 160, attack: 0.05, decay: 0.4, gain: 0.05 }),
   ),
-  // New squares setting off to rebuild a petal: a soft woosh as they sweep in and up the stem.
-  sweep: (s) => drift(s, {
-    path: [[0, 180], [1.4, 750], [3, 300]],
-    level: [[1.2, 0.12], [2, 0.08], [3.2, 0.0001]],
-    q: 0.8,
-  }),
+  // New squares coming in to rebuild a petal (for `length`: their way in and the petal's build): a
+  // low hum that fades in slowly, holds while they come, warming a little, and fades away.
+  sweep: (s) => {
+    const hold = Math.max(0, (s.length ?? 8.5) - 5.2);
+    return Math.max(
+      hum(s, { freqs: [82.41, 110], cutoff: 160, to: 300, glide: hold + 2.2, attack: 2.2, hold, decay: 3, gain: 0.007, smooth: true }),
+      tone(s, { freq: 55, attack: 2.2, hold, decay: 3, gain: 0.025, smooth: true }),
+    );
+  },
   // Pressing the flower, which sends a gust through it.
   gust: (s) => Math.max(
     drift(s, { path: [[0, 140], [0.5, 700], [1.8, 200]], level: [[0.35, 0.14], [0.8, 0.1], [1.9, 0.0001]], q: 0.6 }),
