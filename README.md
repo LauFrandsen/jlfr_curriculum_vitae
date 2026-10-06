@@ -48,10 +48,18 @@ Research: look at how sites with large hero visuals, 3D scenes or canvas animati
 
 ## Publishing
 
-`gh-pages` is the live branch (custom domain in `CNAME`). GitHub Pages builds it with its standard Jekyll build, which copies the site as-is (`_config.yml` only keeps the notes unpublished). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready:
+`gh-pages` is the live branch (custom domain in `CNAME`). GitHub Pages builds it with its standard Jekyll build, which copies the site as-is (`_config.yml` only keeps the notes and `tools/` unpublished). Work happens on `light` (the ink-on-paper design) and gets merged into `gh-pages` when it is ready.
+
+Before publishing, set the site's version: `index.html` loads every file under a version code (`?v=…`, through an import map for the scripts), so visitors' browsers never mix cached files from the last publish with new ones. GitHub Pages lets browsers keep each file for 10 minutes, and a mix can break the page. The script sets the code from the files' contents; commit the change, then publish:
+
+```bash
+node tools/version.mjs
+```
 
 ```bash
 git switch gh-pages && git merge light && git push && git switch light
 ```
+
+A new graphic needs an entry in the import map in `index.html`; the script warns if one is missing.
 
 The earlier dark, blue-dot version is kept on `orb`, and the old Jekyll CV lives on in `gh-pages`' history. Its `projects.html` URL now redirects to `/#projects`. A planned move to `biunefrandsen.dk` is described in `DOMAIN-MIGRATION.md`.

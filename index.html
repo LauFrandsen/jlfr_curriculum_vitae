@@ -11,7 +11,16 @@
   <meta property="og:title" content="Jonas Biune Frandsen · Senior AI Engineer">
   <meta property="og:description" content="Enabling your data. Agentic AI, machine learning and data science, from problem to prototype to production.">
   <meta property="og:url" content="https://laufrandsen.dk/">
-  <link rel="stylesheet" href="style.css">
+  <!-- Each file is loaded under the site's version (set by tools/version.mjs when publishing), so a
+       browser never mixes cached files from one publish with fresh ones from the next. -->
+  <script type="importmap">{"imports": {
+    "./voxel.js": "./voxel.js?v=ee8144f0d0",
+    "./tune.js": "./tune.js?v=ee8144f0d0",
+    "./sound.js": "./sound.js?v=ee8144f0d0",
+    "./graphics/orb.js": "./graphics/orb.js?v=ee8144f0d0",
+    "./graphics/flower.js": "./graphics/flower.js?v=ee8144f0d0"
+  }}</script>
+  <link rel="stylesheet" href="style.css?v=ee8144f0d0">
   <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
@@ -286,6 +295,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="page.js"></script>
+  <script type="module" src="page.js?v=ee8144f0d0"></script>
 </body>
 </html>
