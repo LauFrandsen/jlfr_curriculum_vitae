@@ -864,9 +864,10 @@ function pose(t) {
 
 // ---------- callouts: the squares one may point at ----------
 
-// Shell squares on the front of the orb (as it's turned now), once the intro is over.
+// Shell squares on the front of the orb (as it's turned now), once its opening is over: the intro,
+// and the rockets launched and their orbits laid.
 function marks() {
-  if (introTime < introEnd()) return [];
+  if (!openingOver) return [];
   const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt), out = [];
   for (let i = STORY_TOTAL; i < placed.length / 4; i++) {
     if (placed[i * 4 + 3] >= 1) continue;
@@ -880,7 +881,7 @@ function marks() {
 // the orb's breath and turn (but not the ripples, too small to see).
 function markAt(i, t) {
   const seed = placed[i * 4 + 3];
-  if (!(seed < 1)) return null;
+  if (!openingOver || !(seed < 1)) return null;   // (the intro played again: a callout showing lets go)
   const idle = snoise(placed[i * 4] * 2, placed[i * 4 + 1] * 2 + t * 0.2, placed[i * 4 + 2] * 2) * 0.012;
   const reach = (1 + (seed - 0.5) * 0.04 + idle) * breath;
   const [x, y, z] = spun([0, 1, 2].map((k) => placed[i * 4 + k] * reach), spinAngle + (t - lastT) * CONFIG.spin);
@@ -1081,6 +1082,7 @@ function landSatellite(k, t) {
 // Every rocket back on its pad, to lift off as the page opens (for the tune panel).
 function launchAgain() {
   orbitTime = 0;
+  openingOver = false;
   for (let k = 0; k < 3; k++) {
     launches[k] = LAUNCH.first + k * LAUNCH.stagger;
     lands[k] = relaunches[k] = NEVER;
@@ -1210,6 +1212,7 @@ let orbitTime = 0;            // how far along the orbits things have travelled 
                               // also the launch's clock, from the visit's start
 let lastT = 0;                // the frame clock at the last frame, for poses
 let introTime = 0;            // seconds since the intro began (see INTRO; NEVER once skipped)
+let openingOver = false;      // the intro has played and the orbits have been laid (callouts wait for it)
 
 // How much of the orb shows during the intro, for the paper's scorch behind it: the share of squares
 // that have blipped in, at the core's size.
@@ -1240,6 +1243,11 @@ function frame({ t, dt, set, activeCount }) {
   lastT = t;
   landings(t);
   orbitSounds(prevOrbitTime);
+  // The opening is over once the intro has played and every orbit has been laid (callouts wait for
+  // it); satellites coming down and going up again later don't count.
+  if (!openingOver && introTime >= introEnd()) {
+    openingOver = launches.slice(0, Math.min(3, CONFIG.orbits)).every((l) => orbitTime - l >= LAUNCH.laid);
+  }
   const prevFlowTime = flowTime;
   flowTime += reducedMotion.matches ? run * 0.5 : run;
   flowLandings(prevFlowTime, flowTime, t, activeCount);
@@ -1308,6 +1316,7 @@ const orb = {
   settle: () => {
     introTime = NEVER;
     orbitsUp(LAUNCH.laid + 30);
+    openingOver = true;
   },
   // A satellite is a target of its own: tapping it shoots it down.
   over: (at) => satelliteAt(at) >= 0,
