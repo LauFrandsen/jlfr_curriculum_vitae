@@ -3,6 +3,9 @@
 // in sends a faint ripple over the squares around it. Pressing the orb draws the falling squares in
 // and pauses new ones. Optional simulated "speech". Drawn by voxel.js.
 //
+// As the page opens it plays an intro once: its squares start packed into a small core, unseen, blip
+// in one by one, and the core then opens out into the orb, after which everything else starts.
+//
 // Its look can lean toward a network: squares arriving along traces or brought in by orbits, orbit
 // rings with satellites, antennas sending signals, a latitude/longitude grid that turns, and data arcs
 // drawing across the surface. LOOKS below has presets; the ?tune panel switches between them.
@@ -15,6 +18,9 @@ export const CONFIG = {
   minDotCount: 1500,
   color: [0.067, 0.063, 0.059],   // ink of the squares (#11100f, a warm black)
   burnColor: [0.13, 0.085, 0.05], // ink of the scorch around them: near-black with a trace of umber
+  introCore: 0.3,             // the intro: the orb's squares start packed into a core this size, fraction of radius
+  introBlipSeconds: 1.5,      // the intro: they blip in, one by one, over this long
+  introExpandSeconds: 1.1,    // the intro: then the core opens out into the orb over this long
   breathSeconds: 14,          // one full in-and-out breath
   breathDepth: 0.025,         // how much the orb grows at the top of a breath, fraction of radius
   tilt: 0.22,                 // radians around the X axis: the viewing angle
@@ -127,6 +133,19 @@ const relaunches = [NEVER, NEVER, NEVER];                                    // 
 const crashes = [0, 0, 0];                                                   // 1 while it's down from being shot
 const CRASH_HIT = 1.9;   // seconds (orbit time) for a shot-down satellite's middle to hit the orb
 const launchTime = (k) => launches[k];
+
+// The intro, in seconds from when the orb is first shown: after `delay` its squares blip in over
+// introBlipSeconds, each at its own moment and more and more of them toward the end; after `hold` the
+// core opens out over introExpandSeconds, each square up to `spread` late, overshooting a little
+// (`overshoot`) and settling into the orb. The orbits, breathing and flow wait until it's over.
+const INTRO = { delay: 0.3, hold: 0.2, spread: 0.15, overshoot: 1.2 };
+const introEnd = () => INTRO.delay + CONFIG.introBlipSeconds + INTRO.hold + CONFIG.introExpandSeconds + INTRO.spread;
+// The core's size at intro time x (the shader's, without each square's own lag).
+function introScale(x) {
+  const e = Math.min(1, Math.max(0, (x - INTRO.delay - CONFIG.introBlipSeconds - INTRO.hold) / CONFIG.introExpandSeconds));
+  const c = INTRO.overshoot, back = 1 + (c + 1) * (e - 1) ** 3 + c * (e - 1) ** 2;
+  return CONFIG.introCore + (1 - CONFIG.introCore) * back;
+}
 // How far (radians) satellite k has gone round its orbit s seconds after reaching it.
 const lapped = (k, s) => Math.abs(ORBITS[k].speed) * s + LAUNCH.boost * (1 - Math.exp(-s / LAUNCH.ease));
 
@@ -225,6 +244,9 @@ uniform vec4 uNet2;       // x = longest antenna, y = arc lift, z = seconds to d
                           // out the orbits reach (1 = as set, less to fit the screen)
 uniform vec4 uArcA[${ARCS}];   // per arc: xyz = where it starts (unit vector, turning with the orb), w = when
 uniform vec4 uArcB[${ARCS}];   // xyz = where it ends
+uniform vec4 uIntro;      // the intro: x = seconds since the squares began to blip in, y = how long that
+                          // takes, z = when the core begins to open out, w = how long that takes
+uniform float uIntroCore; // the core's size at the start, fraction of radius
 
 // Orbit k's ring (k = 0, 1, 2): its radius (fitted to the screen), the point at angle a and dr
 // further out, and its speed.
@@ -529,7 +551,8 @@ void main() {
       landed = (phase - fallEnd) * cycle;
     }
 
-    if (landed >= 0.0) heat = slotHeat(landed);
+    // (No flare for one that was already in its slot when the page opened.)
+    if (landed >= 0.0 && landed <= uFlowTime) heat = slotHeat(landed);
   } else if (aSeed >= 1.0) {
     // Loose particle (seed 1..2), extra to the shell: floats outside it on its own slow path
     // and is pushed outward while speaking. Densest at the surface and thinning outward;
@@ -553,6 +576,30 @@ void main() {
     pos = aPos * (1.0 + (aSeed - 0.5) * 0.04 + idle + uEnergy * uVoiceAmp * voice);
   }
 
+  // The intro: everything in the orb (not what's out in space) starts packed into a small core, unseen.
+  // Each square blips in at its own moment, more and more of them toward the end, popping up with a
+  // flare; packed in, they're smaller and lighter, so the core reads as a crowd of squares rather than a
+  // blot. Then the core opens out into the orb, each square a little late, overshooting a touch before
+  // it settles, and the squares grow to their full size and ink. CV entries' squares only move with the
+  // core; flowing squares on their way in wait for the end.
+  float introScale = 1.0, introSize = 1.0;
+  if (!free && uIntro.x < uIntro.z + uIntro.w + 1.0) {
+    float h = hash(aSeed * 71.3 + aPos.x * 13.7 + aPos.y * 5.3 + aPos.z * 3.1);
+    float e = clamp((uIntro.x - uIntro.z - fract(h * 7.31) * ${INTRO.spread.toFixed(2)}) / uIntro.w, 0.0, 1.0);
+    float m = e - 1.0, c = ${INTRO.overshoot.toFixed(2)};
+    introScale = mix(uIntroCore, 1.0, 1.0 + (c + 1.0) * m * m * m + c * m * m);
+    float age = uIntro.x - sqrt(h) * uIntro.y;
+    float pop = step(0.0, age) * exp(-max(age, 0.0) * 9.0);
+    if (falling && aSeed >= 2.0 && aSeed < 3.0) {
+      fade *= smoothstep(uIntro.z + uIntro.w, uIntro.z + uIntro.w + 0.6, uIntro.x);
+    } else if (aSeed < 3.0 || aSeed >= 4.0) {
+      float crowded = 1.0 - smoothstep(0.0, 0.7, e);
+      fade *= smoothstep(0.0, 0.05, age) * (1.0 - 0.6 * crowded);
+      heat += 1.2 * pop;
+      introSize = (1.0 - 0.55 * crowded) * (1.0 + 1.2 * pop);
+    }
+  }
+
   // Ripples from squares slotting in nearby move the shell and the dots resting in their slots.
   float rippleInk = 0.0;
   if (aSeed < 1.0 || (aSeed >= 2.0 && aSeed < 4.0 && !falling)) {
@@ -560,9 +607,9 @@ void main() {
     pos += rp.xyz;
     rippleInk = rp.w;
   }
-  // The orb breathes and turns; what's out in space doesn't.
+  // The orb breathes and turns (and opens out in the intro); what's out in space doesn't.
   if (!free) {
-    pos *= uBreath;
+    pos *= uBreath * introScale;
     float cs = cos(uNet.y), sn = sin(uNet.y);
     pos = vec3(pos.x * cs + pos.z * sn, pos.y, -pos.x * sn + pos.z * cs);
   }
@@ -604,7 +651,7 @@ void main() {
   vec2 screen = project(p, s);
   float depth = clamp((zn + 1.0) * 0.5, 0.0, 1.0);
   // Out from the surface and behind the orb: hidden by it.
-  if (aSeed >= 4.0) fade *= 1.0 - 0.85 * step(p.z, 0.0) * (1.0 - smoothstep(0.92, 1.04, length(p.xy) / uBreath));
+  if (aSeed >= 4.0) fade *= 1.0 - 0.85 * step(p.z, 0.0) * (1.0 - smoothstep(0.92, 1.04, length(p.xy) / (uBreath * introScale)));
 
   if (falling && flowing && uNet.z > 0.5) {
     // Along a trace: in from the side of the screen near its slot's height, straight across with one
@@ -636,7 +683,7 @@ void main() {
 
   // The rim gets a little extra ink so the silhouette reads; story dots may fall through the horizon.
   emit(screen, s, depth, free ? 0.0 : 1.0 - abs(zn), heat, looseDim * fade * (1.0 + rippleInk), uEnergy * 0.1,
-       mix(0.6, 1.0, looseDim), aSeed < 3.0 || aSeed >= 4.0);
+       mix(0.6, 1.0, looseDim) * introSize, aSeed < 3.0 || aSeed >= 4.0);
 }`;
 
 // ---------- the squares ----------
@@ -765,13 +812,14 @@ function pose(t) {
   const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt);
   const turn = spinAngle + (t - lastT) * CONFIG.spin;
   const travelled = orbitTime + (t - lastT) * CONFIG.orbitSpeed;
+  const core = introTime < introEnd() ? introScale(introTime + t - lastT) : 1;   // its size, mid-intro
   for (let i = 0; i < placed.length / 4; i++) {
     const seed = placed[i * 4 + 3];
     const at = [placed[i * 4], placed[i * 4 + 1], placed[i * 4 + 2]];
     let p, looseDim = 1, inSpace = false;
     if (seed >= 7) continue;
     if (seed >= 6) {
-      p = spun(at.map((x) => x * breath), turn);
+      p = spun(at.map((x) => x * breath * core), turn);
     } else if (seed >= 5) {
       const k = at[0], o = ORBITS[k], tau = travelled - launchTime(k);
       if (tau < 0 || travelled >= lands[k]) continue;
@@ -801,7 +849,7 @@ function pose(t) {
         reach = 1.01 + outer * CONFIG.looseSpread;
         looseDim = 0.8 + (0.2 - 0.8) * outer;
       }
-      p = spun(at.map((x) => x * reach * breath), turn);
+      p = spun(at.map((x) => x * reach * breath * core), turn);
     }
     const [x, y, z] = p;
     const py = y * ct - z * st, pz = y * st + z * ct;
@@ -992,6 +1040,17 @@ function landSatellite(k, t) {
   scheduled.push({ dir: ORBITS[k].site, time: t + LAUNCH.descent / Math.max(CONFIG.orbitSpeed, 0.01) });
 }
 
+// Every rocket back on its pad, to lift off as the page opens (for the tune panel).
+function launchAgain() {
+  orbitTime = 0;
+  for (let k = 0; k < 3; k++) {
+    launches[k] = LAUNCH.first + k * LAUNCH.stagger;
+    lands[k] = relaunches[k] = NEVER;
+    crashes[k] = 0;
+  }
+  nextLanding = NEVER;
+}
+
 // All orbits up, as if launched long ago (morphed into, or launched again from the start).
 function orbitsUp(since) {
   for (let k = 0; k < 3; k++) {
@@ -1053,23 +1112,36 @@ let spinAngle = 0;            // how far the orb has turned
 let orbitTime = 0;            // how far along the orbits things have travelled (scaled by orbitSpeed);
                               // also the launch's clock, from the visit's start
 let lastT = 0;                // the frame clock at the last frame, for poses
+let introTime = 0;            // seconds since the intro began (see INTRO; NEVER once skipped)
+
+// How much of the orb shows during the intro, for the paper's scorch behind it: the share of squares
+// that have blipped in, at the core's size.
+function introShown() {
+  if (introTime >= introEnd()) return 1;
+  const blipped = Math.min(1, Math.max(0, (introTime - INTRO.delay) / Math.max(CONFIG.introBlipSeconds, 0.01))) ** 2;
+  return blipped * Math.min(1, introScale(introTime));
+}
 
 function frame({ t, dt, set, activeCount }) {
   updateVoice(t, dt);
   const slow = reducedMotion.matches ? 0.3 : 1;
+  // The intro plays first (not with reduced motion); everything else waits for it.
+  if (reducedMotion.matches) introTime = Math.max(introTime, introEnd());
+  introTime += dt;
+  const run = introTime < introEnd() ? 0 : dt;
 
   // Breathing: smooth in-and-out scale, gentler with reduced motion.
-  breathPhase += (dt * Math.PI * 2) / CONFIG.breathSeconds;
+  breathPhase += (run * Math.PI * 2) / CONFIG.breathSeconds;
   const depth = reducedMotion.matches ? CONFIG.breathDepth * 0.5 : CONFIG.breathDepth;
   breath = 1 + depth * (0.5 - 0.5 * Math.cos(breathPhase));
-  voiceTime += dt * CONFIG.voiceSpeed;
-  spinAngle += dt * CONFIG.spin * slow;
-  orbitTime += dt * CONFIG.orbitSpeed * slow;
+  voiceTime += run * CONFIG.voiceSpeed;
+  spinAngle += run * CONFIG.spin * slow;
+  orbitTime += run * CONFIG.orbitSpeed * slow;
   if (reducedMotion.matches && orbitTime < LAUNCH.done) orbitsUp(LAUNCH.laid + 30);   // no launch: the orbits are up
   lastT = t;
   landings(t);
   const prevFlowTime = flowTime;
-  flowTime += reducedMotion.matches ? dt * 0.5 : dt;
+  flowTime += reducedMotion.matches ? run * 0.5 : run;
   flowLandings(prevFlowTime, flowTime, t, activeCount);
   updateArcs(t);
   // Brought in by orbits needs an orbit; without one, they come along traces.
@@ -1104,6 +1176,8 @@ function frame({ t, dt, set, activeCount }) {
   set('uLaunch', [launches[0], launches[1], launches[2], 0]);
   set('uLand', [lands[0], lands[1], lands[2], 0]);
   set('uCrash', [crashes[0], crashes[1], crashes[2], 0]);
+  set('uIntro', [introTime - INTRO.delay, CONFIG.introBlipSeconds, CONFIG.introBlipSeconds + INTRO.hold, Math.max(0.05, CONFIG.introExpandSeconds)]);
+  set('uIntroCore', CONFIG.introCore);
 }
 
 // ---------- the graphic ----------
@@ -1126,8 +1200,12 @@ const orb = {
   pose,
   onDrop,
   look,
-  // Morphed into, it arrives with its orbits up (the launch plays once per visit, as the page opens).
-  settle: () => orbitsUp(LAUNCH.laid + 30),
+  // Morphed into, it arrives whole with its orbits up (the intro and the launch play once per visit,
+  // as the page opens).
+  settle: () => {
+    introTime = NEVER;
+    orbitsUp(LAUNCH.laid + 30);
+  },
   // A satellite is a target of its own: tapping it shoots it down.
   over: (at) => satelliteAt(at) >= 0,
   tap: (at) => {
@@ -1138,9 +1216,13 @@ const orb = {
   },
   press: gather,
   focus: (on) => { if (on) gather(); },
-  // The paper's scorch behind the orb swells a little while it "speaks".
-  halo: () => 0.6 + voice.energy * CONFIG.speech * 0.8,
+  // The paper's scorch behind the orb swells a little while it "speaks", and grows with it in the intro.
+  halo: () => (0.6 + voice.energy * CONFIG.speech * 0.8) * introShown(),
   sliders: [
+    { group: 'Intro' },
+    { key: 'introCore', label: 'Core at the start (share of radius)', min: 0.02, max: 0.8, step: 0.01 },
+    { key: 'introBlipSeconds', label: 'Squares blip in over (s)', min: 0, max: 5, step: 0.1 },
+    { key: 'introExpandSeconds', label: 'Core opens out over (s)', min: 0.2, max: 5, step: 0.1 },
     { group: 'Orb' },
     { key: 'dotCount', label: 'Number of dots', min: 1000, max: 20000, step: 500, apply: rebuildNow },
     { key: 'breathSeconds', label: 'Breath length (s)', min: 1, max: 20, step: 0.5 },
@@ -1190,15 +1272,11 @@ const orb = {
     { key: 'looseVoice', label: 'Push when speaking', min: 0, max: 0.6, step: 0.01 },
   ],
   actions: {
-    'Launch again': () => {
-      orbitTime = 0;
-      for (let k = 0; k < 3; k++) {
-        launches[k] = LAUNCH.first + k * LAUNCH.stagger;
-        lands[k] = relaunches[k] = NEVER;
-        crashes[k] = 0;
-      }
-      nextLanding = NEVER;
+    'Play intro': () => {
+      introTime = 0;
+      launchAgain();
     },
+    'Launch again': launchAgain,
     // Shoots down a satellite on the front of its orbit, as tapping one does.
     'Shoot one down': () => {
       const up = [...Array(Math.min(3, CONFIG.orbits)).keys()]
