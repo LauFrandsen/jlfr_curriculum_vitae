@@ -13,7 +13,9 @@
 // holds until something is over.
 
 // A phone (a touch screen and no mouse): its small speaker can't play the deep bass, and driven with it
-// anyway it crackles, so there the sound is cut below lowCut.
+// anyway it crackles, so there the sound is cut below lowCut. Its audio also falls behind more easily
+// (busy drawing the graphic, say), which crackles too, so it gets bigger audio buffers (the sound comes
+// a little later) and a shorter reverb for the music, which is most of the music's work.
 const PHONE = matchMedia('(pointer: coarse) and (hover: none)').matches;
 
 // Tunable (the ?tune panel): overall volume, the music's level, how much of the effects comes back
@@ -377,7 +379,8 @@ export const SOUNDS = {
 //   - a pad of warm chords in A minor, one every 15-22 seconds, each fading in over seven seconds and
 //     out over nine, so they overlap;
 //   - now and then a single soft bell note from the chord, sometimes answered by a second.
-// The pads, bells and wind ring out into a long, dark reverb (the effects keep their own small room).
+// The pads, bells and wind ring out into a long, dark reverb (half as long on a phone; the effects keep
+// their own small room).
 
 const CHORDS = [   // A minor, each voiced from its bass up
   [110, 164.81, 246.94, 261.63, 329.63],    // Am(add9)
@@ -400,6 +403,15 @@ function held(type, freq, level, to) {
   o.start();
 }
 
+// Filter f, its settings updated once per block of 128 samples instead of every sample: much less
+// work, and no different for the music's slow sweeps.
+function blockRate(f) {
+  for (const p of [f.frequency, f.Q, f.detune, f.gain]) {
+    try { p.automationRate = 'k-rate'; } catch { /* stays per sample */ }
+  }
+  return f;
+}
+
 // A slow wobble of param around where it is: rate in Hz, depth in its own units.
 function sway(param, rate, depth) {
   const lfo = ctx.createOscillator(), g = ctx.createGain();
@@ -415,13 +427,13 @@ function startMusic() {
   bus.gain.value = 0;
   bus.connect(master);
   const space = ctx.createConvolver();
-  space.buffer = roomResponse(5, 0.06, 2);
+  space.buffer = roomResponse(PHONE ? 2.5 : 5, 0.06, 2);
   const wet = ctx.createGain();
   wet.gain.value = 0.8;
   wet.connect(space).connect(bus);
 
   // The drone, dry.
-  const lowpass = ctx.createBiquadFilter();
+  const lowpass = blockRate(ctx.createBiquadFilter());
   lowpass.type = 'lowpass';
   lowpass.frequency.value = 280;
   lowpass.Q.value = 0.6;
@@ -434,7 +446,7 @@ function startMusic() {
   held('sine', 110.3, 0.45, lowpass);
 
   // The wind: dark noise, its band drifting, mostly heard in the reverb.
-  const wind = ctx.createBufferSource(), band = ctx.createBiquadFilter(), windLevel = ctx.createGain();
+  const wind = ctx.createBufferSource(), band = blockRate(ctx.createBiquadFilter()), windLevel = ctx.createGain();
   wind.buffer = noise;
   wind.loop = true;
   band.type = 'bandpass';
@@ -474,7 +486,7 @@ function plan() {
 // lowpass that opens a little and closes again.
 function pad(chord, t, length) {
   const attack = 7, release = 9, end = t + length + release;
-  const f = ctx.createBiquadFilter(), g = ctx.createGain();
+  const f = blockRate(ctx.createBiquadFilter()), g = ctx.createGain();
   f.type = 'lowpass';
   f.Q.value = 0.5;
   f.frequency.setValueAtTime(380, t);
@@ -548,7 +560,11 @@ function roomResponse(seconds, bright, fall) {
 function build() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return false;
-  ctx = new AC();
+  try {
+    ctx = new AC(PHONE ? { latencyHint: 'playback' } : undefined);
+  } catch {
+    ctx = new AC();
+  }
   const limiter = ctx.createDynamicsCompressor();
   limiter.threshold.value = -14;
   limiter.knee.value = 10;
