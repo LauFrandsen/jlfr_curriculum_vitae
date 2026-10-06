@@ -252,8 +252,8 @@ export const SOUNDS = {
   sweep: (s) => {
     const hold = Math.max(0, (s.length ?? 8.5) - 5.2);
     return Math.max(
-      hum(s, { freqs: [82.41, 110], cutoff: 160, to: 300, glide: hold + 2.2, attack: 2.2, hold, decay: 3, gain: 0.007, smooth: true }),
-      tone(s, { freq: 55, attack: 2.2, hold, decay: 3, gain: 0.025, smooth: true }),
+      hum(s, { freqs: [82.41, 110], cutoff: 160, to: 300, glide: hold + 2.2, attack: 2.2, hold, decay: 3, gain: 0.011, smooth: true }),
+      tone(s, { freq: 55, attack: 2.2, hold, decay: 3, gain: 0.04, smooth: true }),
     );
   },
   // Pressing the flower, which sends a gust through it.
