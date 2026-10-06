@@ -353,6 +353,12 @@ export const SOUNDS = {
     hiss(s, { freq: 350, to: 1100, attack: 0.04, decay: 0.3, gain: 0.08 }),
     tone(s, { freq: 98, to: 73, attack: 0.02, decay: 0.3, gain: 0.07 }),
   ),
+  // The guided tour (tour.js) moving on to another part of the CV: a soft, low knock and a breath of
+  // paper. (The tour's bar comes and goes with `open` and `close`.)
+  step: (s) => Math.max(
+    tone(s, { freq: 87.31, to: 73.42, attack: 0.006, decay: 0.25, gain: 0.1 }),
+    hiss(s, { freq: 450, attack: 0.004, decay: 0.09, gain: 0.05 }),
+  ),
   // A square calling out a skill (callouts.js): two soft, low blinks, a warm swell as it lights up,
   // and a quiet knock as the box appears.
   callout: (s) => Math.max(

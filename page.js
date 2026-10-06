@@ -1,10 +1,11 @@
 // Page behaviour around the graphic: picking it, section reveals, CV entries sending their squares
-// into it, project panes, the scroll cue, the PDF button and the sound button. (callouts.js runs the
-// graphic's callouts on its own.)
+// into it, project panes, the Explore button, the PDF button and the sound button. (callouts.js runs
+// the graphic's callouts on its own, and tour.js the guided tour.)
 
 import { current, dropFrom, reducedMotion, setFocus, start } from './voxel.js';
 import { play, setSound, soundOn } from './sound.js';
 import './callouts.js';
+import './tour.js';
 
 // A graphic of ink squares, picked at random on each visit (?graphic=orb or flower picks one), which
 // morphs into the next one in the list every few minutes of the page being on screen.
@@ -46,9 +47,26 @@ const dropper = new IntersectionObserver((entries) => {
 }, { threshold: 0.5, rootMargin: '0px 0px -15% 0px' });
 drops.forEach((el) => dropper.observe(el));
 
-// The scroll cue fades once the visitor starts scrolling.
-const cue = document.querySelector('.scroll-cue');
-addEventListener('scroll', () => cue?.classList.toggle('hidden', scrollY > 40), { passive: true });
+// The Explore button (the guided tour, tour.js) fades once the visitor starts scrolling.
+const explore = document.querySelector('.explore');
+addEventListener('scroll', () => explore?.classList.toggle('hidden', scrollY > 40), { passive: true });
+
+// On a phone each section's label sticks to the top while its section is in view (style.css); once
+// it has reached the top it's .stuck, and gets the strip of paper the text slides under.
+const labels = [...document.querySelectorAll('.cv h2')];
+function stick() {
+  const top = parseFloat(getComputedStyle(labels[0]).top);   // NaN (auto) where they don't stick
+  for (const h of labels) h.classList.toggle('stuck', h.getBoundingClientRect().top <= top + 0.5);
+}
+if (labels.length) {
+  addEventListener('scroll', stick, { passive: true });
+  addEventListener('resize', stick);
+  // A section still rising into place (.reveal) can carry its label up to the top after the scrolling stops.
+  document.querySelector('.cv').addEventListener('transitionend', (e) => {
+    if (e.propertyName === 'transform') stick();
+  });
+  stick();
+}
 
 document.getElementById('pdf-button')?.addEventListener('click', () => window.print());
 

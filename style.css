@@ -182,7 +182,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   justify-content: center;
   gap: clamp(3rem, 11svh, 7rem);
   padding: var(--gutter);
-  padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 60px);   /* room for the scroll cue */
+  padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 6.5rem);   /* room for Explore */
   pointer-events: none;   /* taps and hovers reach the canvas underneath */
 }
 
@@ -234,25 +234,98 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 }
 .hero-links a:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
 
-.scroll-cue {
+/* Explore: a window at the bottom of the hero that starts the guided tour (tour.js). It's made like
+   the graphics: tour.js draws its edge in ink squares, each with its soft burn. It hovers over the
+   paper, rising and sinking slowly, its scorch below it fading as it rises, and lifts a little more
+   under the mouse; its arrow nudges down. Over it, a line about the tour shows on hover or keyboard
+   focus (only with JS, which runs the tour). It all fades once the page is scrolled. */
+.explore {
   position: absolute;
-  bottom: max(1.25rem, env(safe-area-inset-bottom));
   left: 50%;
+  bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 0.25rem);
+  translate: -50% 0;
   display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-left: -22px;
-  color: var(--muted);
-  pointer-events: auto;
+  justify-items: center;
   transition: opacity 0.4s;
 }
-.scroll-cue svg { animation: cue 2.6s ease-in-out infinite; }
-.scroll-cue.hidden { opacity: 0; pointer-events: none; }
+.explore.hidden { opacity: 0; }
+.explore.hidden .explore-button { pointer-events: none; }
+
+.explore-float { animation: float 6s ease-in-out infinite; }
+.explore-shadow {
+  width: 82%;
+  height: 16px;
+  margin-top: 10px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(58, 38, 20, 0.15), rgba(58, 38, 20, 0.05) 60%, transparent);
+  animation: float-shadow 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+@keyframes float-shadow {
+  0%, 100% { scale: 1; opacity: 1; }
+  50% { scale: 0.84; opacity: 0.55; }
+}
+
+.explore-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1.05rem 1.6rem 1.05rem 2.05rem;
+  border: 1px solid var(--ink);   /* until tour.js draws its squares */
+  background: rgba(250, 248, 243, 0.5);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  text-decoration: none;
+  pointer-events: auto;   /* the rest of the hero lets pointers through to the graphic */
+  transition: background-color 0.4s, translate 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.explore-button.drawn { border-color: transparent; }
+.explore-button canvas {
+  position: absolute;
+  inset: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  pointer-events: none;
+}
+.explore-button svg { animation: cue 2.6s ease-in-out infinite; }
+@media (hover: hover) {
+  .explore-button:hover { translate: 0 -3px; background-color: rgba(250, 248, 243, 0.85); }
+}
+
+.explore-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  display: none;
+  width: max-content;
+  max-width: min(23rem, 100vw - 2 * var(--gutter));
+  margin: 0 0 0.9rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.55;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-wrap: balance;
+  opacity: 0;
+  translate: -50% 6px;
+  pointer-events: none;
+  transition: opacity 0.4s, translate 0.4s;
+}
+.js .explore-hint { display: block; }
+.explore:has(.explore-button:hover) .explore-hint,
+.explore:has(.explore-button:focus-visible) .explore-hint { opacity: 1; translate: -50% 0; }
 
 @keyframes cue {
-  0%, 100% { transform: translateY(0); opacity: 0.6; }
-  50% { transform: translateY(6px); opacity: 1; }
+  0%, 100% { transform: translateY(-1px); opacity: 0.6; }
+  50% { transform: translateY(3px); opacity: 1; }
 }
 
 /* Callouts (callouts.js): a square of the graphic turns --signal (the graphic draws that) and a line
@@ -329,6 +402,115 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .sound-button[aria-pressed="false"] .sound-waves { display: none; }
 @media (hover: hover) {
   .sound-button:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+}
+
+/* The guided tour (tour.js): a window along the bottom, beside the sound button on phones (over the
+   horizon, where the text has faded anyway) and under the CV's column on wider screens. The part
+   it's at is named over a line about it, with a small square per stop, filled in ink up to the one
+   it's at (scorched), and Back and Next. It slides away while a project pane is open. */
+.tour {
+  position: fixed;
+  left: max(var(--gutter), env(safe-area-inset-left));
+  right: calc(max(var(--gutter), env(safe-area-inset-right)) + 48px);   /* clear of the sound button */
+  bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  z-index: 3;   /* above the graphic on the horizon */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.2rem 0.75rem;
+  padding: 0.7rem 0.7rem 0.7rem 1rem;
+  border: 1px solid var(--line-strong);
+  background: rgba(250, 248, 243, 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px -26px rgba(58, 38, 20, 0.45);
+  transition: opacity 0.4s, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.tour[hidden] { display: none; }
+.tour.away, html.focusing .tour { opacity: 0; transform: translateY(16px); pointer-events: none; }
+
+@media (min-width: 720px) {
+  .tour { left: 50%; right: auto; width: 34rem; translate: -50% 0; }
+}
+@media (min-width: 1100px) {   /* under the CV's column, which sits to the left; riding, in the middle */
+  .tour { left: calc(max(7vw, 48px) + var(--gutter)); translate: none; }
+  html.riding .tour { left: 50%; translate: -50% 0; }
+}
+
+.tour-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.tour-end {
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -0.3rem -0.3rem 0 0;
+  padding: 0;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.tour-text {
+  grid-column: 1 / -1;
+  margin: 0 0 0.45rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.tour-stops {
+  display: flex;
+  margin: 0 0 0 -5px;
+  padding: 0;
+  list-style: none;
+}
+.tour-stop {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tour-stop::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--line-strong);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+.tour-stop.seen::before { border-color: var(--ink); background: var(--ink); }
+.tour-stop[aria-current]::before { box-shadow: 0 0 6px 2px color-mix(in srgb, var(--burn) 40%, transparent); }
+.tour-steps { display: flex; gap: 0.4rem; }
+.tour-steps button {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+}
+.tour-steps .tour-next { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+.tour-back:disabled { opacity: 0.35; cursor: default; }
+@media (hover: hover) {
+  .tour-end:hover { border-color: var(--line-strong); color: var(--ink); }
+  .tour-back:not(:disabled):hover { border-color: var(--ink); }
+  .tour-steps .tour-next:hover { background: transparent; color: var(--ink); }
 }
 
 /* ---------- CV column ---------- */
@@ -753,6 +935,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
 
 /* footer */
 .site-footer {
+  scroll-margin-top: 3rem;   /* the tour's last stop */
   margin-top: 6rem;
   padding-top: 2rem;
   border-top: 1px solid var(--line);
@@ -786,19 +969,170 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
 }
 .js .reveal.visible { opacity: 1; transform: none; }
 
+/* The ride's windows (tour.js): at each stop, pieces of that part of the CV, each joined by a purple
+   line to a square of the orb lit for it, the squares joined in turn by a dotted purple trail. Over
+   the graphic, under the bar; they slide up into place as their line reaches them. */
+.ride { position: fixed; inset: 0; z-index: 2; pointer-events: none; transition: opacity 0.4s; }
+.ride[hidden] { display: none; }
+html.focusing .ride { opacity: 0; }
+.ride svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ride-line { fill: none; stroke: var(--signal); stroke-width: 1; transition: opacity 0.3s; }
+.ride-walk { fill: none; stroke: var(--signal); stroke-width: 1.5; stroke-dasharray: 1.5 5; stroke-linecap: square; opacity: 0.8; }
+.ride-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.6rem 0.8rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  background: var(--raised);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  pointer-events: auto;
+  opacity: 0;
+  translate: 0 10px;
+  transition: opacity 0.45s, translate 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s, top 0.35s;
+}
+.ride-card.shown { opacity: 1; translate: none; }
+.ride-card[role="button"] { cursor: pointer; padding-right: 2rem; }
+.ride-card[role="button"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (hover: hover) {
+  .ride-card[role="button"]:hover { border-color: var(--signal); }
+}
+.ride-kind {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ride-title { color: var(--ink); font-size: 0.98rem; font-weight: 500; line-height: 1.3; }
+.ride-note { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+.ride-text { margin: 0; color: var(--text-strong); }
+.ride-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.15rem 0 0; padding: 0; list-style: none; }
+.ride-chips li {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line);
+  background: var(--chip-bg);
+  color: var(--text-strong);
+  font-size: 0.74rem;
+}
+.ride-card:not(.open) .ride-chips.folds li:nth-child(n + 6):not(.ride-plus), .ride-card.open .ride-plus { display: none; }
+.ride-plus { color: var(--muted) !important; font-family: var(--mono); }
+.ride-more { display: none; margin: 0.3rem 0 0; padding-left: 1rem; list-style: square; font-size: 0.82rem; }
+.ride-more li { margin-bottom: 0.25rem; }
+.ride-more li::marker { color: var(--signal); }
+.ride-card.open .ride-more { display: block; }
+.ride-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 1rem; margin-top: 0.2rem; font-family: var(--mono); font-size: 0.78rem; }
+.ride-pdf {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ride-cue {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.6rem;
+  color: var(--signal);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+/* Squeezed, when a stop's windows don't fit: tighter, the small line and the note side by side, long
+   text cut to four lines (a tap shows it whole), the chips on one row fading out at its end. */
+.ride-card.compact { grid-template-columns: auto minmax(0, 1fr); gap: 0.1rem 0.6rem; padding: 0.45rem 2rem 0.5rem 0.7rem; font-size: 0.8rem; }
+.ride-card.compact > :not(.ride-cue) { grid-column: 1 / -1; }
+.ride-card.compact .ride-kind { grid-column: 1; }
+.ride-card.compact .ride-note { grid-row: 1; grid-column: 2; justify-self: end; max-width: 100%; overflow: hidden; font-size: 0.66rem; text-overflow: ellipsis; white-space: nowrap; }
+.ride-card.compact .ride-text { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.ride-card.clips:not(.clipped):not(.open) .ride-cue { display: none; }
+.ride-card.compact:not(.open) .ride-chips { flex-wrap: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 80%, transparent); mask-image: linear-gradient(to right, #000 80%, transparent); }
+.ride-card.compact:not(.open) .ride-plus { display: none; }
+.ride-card.compact .ride-chips li { flex: none; }
+/* Open, the stop's other windows step aside; one taller than the room scrolls within. */
+.ride-card.open { overflow-y: auto; overscroll-behavior: contain; }
+.ride-card.aside { opacity: 0 !important; pointer-events: none; }
+
+/* Riding along (the guided tour as a ride, tour.js): the page's text gives way to the graphic as the
+   camera flies into it, and comes back as it flies back out. */
+html.riding { overflow: hidden; }
+html.riding .tour-text { display: none; }   /* the windows tell it */
+html.riding .cv, html.riding .hero { opacity: 0; transition: opacity 0.9s; }
+html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { pointer-events: none; }
+
+/* On the guided tour, the rest of the CV dims around the part it's at. */
+.js.touring .cv > .reveal.visible:not(.tour-here) { opacity: 0.3; }
+
 @media (prefers-reduced-motion: reduce) {
   .js .reveal { opacity: 1; transform: none; transition: none; }
-  .scroll-cue svg, .tl-marker { animation: none !important; }
+  .explore-button svg, .explore-float, .explore-shadow, .tl-marker { animation: none !important; }
   .project, .project-hint { transition: none; }
 }
 
 /* ---------- phones ---------- */
 
+/* Smaller type and tighter spacing, so more of the CV fits on a screen at once. Each section's label
+   stays at the top while its section is in view, on a strip of paper the text slides under, so it's
+   clear where you are. */
 @media (max-width: 480px) {
-  .cv section { padding-top: 4rem; }
+  body {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    overflow-x: clip;   /* not hidden: that makes it a scroll box once a pane locks the page, and the labels let go */
+  }
+  .cv section {
+    padding-top: 2.55rem;
+    isolation: isolate;   /* the label goes over its section's text, but still under the horizon's fade */
+  }
+  .cv p { margin-bottom: 0.8rem; }
+  .cv li { margin-bottom: 0.25rem; }
+  .cv h2 {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 calc(-1 * var(--gutter)) 0.6rem;
+    padding: 0.7rem var(--gutter);
+    transition: background-color 0.2s, box-shadow 0.2s;
+  }
+  .cv h2.stuck {   /* (page.js) */
+    background: rgba(245, 242, 234, 0.88);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 1px 0 var(--line);
+  }
+  .cv h3 { font-size: 1rem; }
   .intro { padding-top: 14vh !important; }
-  .cv .tl-item { padding-left: 1.6rem; }
+  .intro h1 { font-size: 1.9rem; }
+  .role { font-size: 0.95rem; }
+  .lead { margin-top: 1.25rem !important; font-size: 1rem; }
+  .contact { font-size: 0.74rem; }
+  .chips { gap: 0.3rem; margin-top: 1rem !important; }
+  .chips li, .dialog-body .chips li { padding: 0.14rem 0.48rem; font-size: 0.74rem; }
+  .chips-small li { font-size: 0.7rem; }
+  .cv .tl-item { margin-bottom: 2.1rem; padding-left: 1.6rem; }
+  .tl-marker { top: 0.45rem; }
+  .tl-meta { margin-bottom: 0.6rem !important; font-size: 0.72rem; }
   .project { padding-right: 1rem; }
+  .project .tl-marker { top: 1.6rem; }
+  .skill-group .chips { padding: 0.75rem 1rem !important; }
+  .trait { padding: 1rem 1rem 0.85rem; }
+  .trait h3 { font-size: 0.92rem; }
+  .trait li { font-size: 0.86rem; }
+  .note { font-size: 0.8rem; }
+  .cv h3.sub { margin-top: 2.25rem; }
+  .site-footer { margin-top: 4.5rem; }
+  .dialog-body h2 { font-size: 1.35rem; }
+  .dialog-body .project-summary { font-size: 0.98rem; }
+  .dialog-body li { margin-bottom: 0.4rem; }
 }
 
 /* ---------- print / PDF: clean paper version ---------- */
@@ -817,13 +1151,15 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .callout, .callout-box, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .tour, .callout, .callout-box, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }
   .project-open { font-weight: inherit; }
   .print-only { display: block; }
   .js .reveal { opacity: 1 !important; transform: none !important; }
+  html.riding .cv { opacity: 1 !important; }
+  .ride { display: none !important; }
   a { color: var(--text-strong); text-decoration: none; }
 
   .cv { max-width: none; margin: 0; padding: 0; text-shadow: none; }

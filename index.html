@@ -14,14 +14,15 @@
   <!-- Each file is loaded under the site's version (set by tools/version.mjs when publishing), so a
        browser never mixes cached files from one publish with fresh ones from the next. -->
   <script type="importmap">{"imports": {
-    "./voxel.js": "./voxel.js?v=d71d0af633",
-    "./tune.js": "./tune.js?v=d71d0af633",
-    "./sound.js": "./sound.js?v=d71d0af633",
-    "./callouts.js": "./callouts.js?v=d71d0af633",
-    "./graphics/orb.js": "./graphics/orb.js?v=d71d0af633",
-    "./graphics/flower.js": "./graphics/flower.js?v=d71d0af633"
+    "./voxel.js": "./voxel.js?v=e5794ed3ab",
+    "./tune.js": "./tune.js?v=e5794ed3ab",
+    "./sound.js": "./sound.js?v=e5794ed3ab",
+    "./callouts.js": "./callouts.js?v=e5794ed3ab",
+    "./tour.js": "./tour.js?v=e5794ed3ab",
+    "./graphics/orb.js": "./graphics/orb.js?v=e5794ed3ab",
+    "./graphics/flower.js": "./graphics/flower.js?v=e5794ed3ab"
   }}</script>
-  <link rel="stylesheet" href="style.css?v=d71d0af633">
+  <link rel="stylesheet" href="style.css?v=e5794ed3ab">
   <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
@@ -46,9 +47,18 @@
         </a>
       </nav>
     </div>
-    <a class="scroll-cue" href="#about" aria-label="Scroll to CV">
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
+    <!-- Explore: starts the guided tour (tour.js, which also draws its edge in ink squares); without JS,
+         it just goes down to the CV. The hint shows on hover. -->
+    <div class="explore">
+      <p class="explore-hint" id="explore-hint">Take a guided tour through my CV, or simply scroll to go at your own pace</p>
+      <div class="explore-float">
+        <a class="explore-button" id="explore-button" href="#about" aria-describedby="explore-hint">
+          Explore
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+      <span class="explore-shadow" aria-hidden="true"></span>
+    </div>
   </header>
 
   <!-- Sound: off until it's pressed (sound.js, page.js). -->
@@ -60,8 +70,34 @@
     </svg>
   </button>
 
+  <!-- The guided tour (tour.js): a bar along the bottom that takes the visitor through the CV, stop by
+       stop. Its stops are the parts of the CV with a data-tour (the line it shows there), named by
+       their heading or data-tour-title. -->
+  <div class="tour" id="tour" role="region" aria-label="Guided tour" hidden>
+    <p class="tour-title" id="tour-title"></p>
+    <button class="tour-end" type="button" aria-label="End the tour" title="End the tour">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <p class="tour-text" aria-live="polite"></p>
+    <ol class="tour-stops" aria-label="Stops"></ol>
+    <div class="tour-steps">
+      <button class="tour-back" type="button">Back</button>
+      <button class="tour-next" type="button">Next</button>
+    </div>
+  </div>
+
   <main class="cv">
-    <section id="about" class="intro reveal">
+    <!-- An introduction for the guided tour only: its first stop when it's a ride (tour.js); hidden on the
+         page. Each paragraph is a window: data-kind is its small line, data-note the one beside it, and a
+         <strong> its title. -->
+    <section id="hello" class="tour-only" data-tour-title="Hello" data-tour="A little about me first." hidden>
+      <p data-kind="Hello" data-note="Copenhagen, Denmark"><strong>I'm Jonas</strong></p>
+      <p>I started out studying film and media, then moved into software design and AI. Today I build AI and ML systems at Heyra, from the first idea all the way to production.</p>
+      <p>I do my best work close to people: listening to what they actually need, and building things that solve real problems rather than technical gimmicks.</p>
+      <p>Outside work I'm usually out on a trail, or around a Dungeons &amp; Dragons table with the same party I've played with for ten years.</p>
+    </section>
+
+    <section id="about" class="intro reveal" data-tour-title="About" data-tour="Who I am and what I do, in short.">
       <h1>Jonas Biune Frandsen</h1>
       <p class="role">Senior AI Engineer at <a href="https://heyra.ai/">Heyra</a></p>
       <ul class="contact">
@@ -81,7 +117,7 @@
       </ul>
     </section>
 
-    <section id="experience" class="reveal">
+    <section id="experience" class="reveal" data-tour="Where I've worked and studied, newest first.">
       <h2>Experience &amp; education</h2>
       <ol class="timeline">
         <li class="tl-item current" data-drop>
@@ -147,7 +183,7 @@
       </ol>
     </section>
 
-    <section id="projects" class="reveal">
+    <section id="projects" class="reveal" data-tour="Two projects up close. Open one for the whole story.">
       <h2>Projects</h2>
       <article class="project" data-drop>
         <span class="tl-marker" aria-hidden="true"></span>
@@ -186,7 +222,7 @@
       </article>
     </section>
 
-    <section id="skills" class="reveal">
+    <section id="skills" class="reveal" data-tour="The tools and methods I work with.">
       <h2>Technical skills</h2>
       <div class="skill-groups">
         <div class="skill-group">
@@ -230,7 +266,7 @@
       </div>
     </section>
 
-    <section id="personal" class="reveal">
+    <section id="personal" class="reveal" data-tour="How I work with people, and the languages I speak.">
       <h2>Personal skills</h2>
       <div class="traits">
         <div class="trait">
@@ -271,12 +307,12 @@
       </ul>
     </section>
 
-    <section id="beyond" class="reveal">
+    <section id="beyond" class="reveal" data-tour="And who I am outside work.">
       <h2>Beyond work</h2>
       <p>Ten years of Dungeons &amp; Dragons with the same party, and as much hiking and sleeping outdoors as the calendar allows. Fully committed on both fronts.</p>
     </section>
 
-    <footer class="site-footer reveal">
+    <footer class="site-footer reveal" data-tour-title="Contact" data-tour="That's the tour. Get in touch, or save the CV as a PDF.">
       <ul class="contact">
         <li><a href="mailto:color@laufrandsen.dk">color@laufrandsen.dk</a></li>
         <li><a href="https://www.linkedin.com/in/biunefrandsen">LinkedIn</a></li>
@@ -296,6 +332,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="page.js?v=d71d0af633"></script>
+  <script type="module" src="page.js?v=e5794ed3ab"></script>
 </body>
 </html>
