@@ -10,7 +10,7 @@
 // rings with satellites, antennas sending signals, a latitude/longitude grid that turns, and data arcs
 // drawing across the surface. LOOKS below has presets; the ?tune panel switches between them.
 
-import { STORY_DOTS, STORY_TOTAL, evenOrder, exact, panOf, rebuild, reducedMotion, stage, storyLanded } from '../voxel.js';
+import { STORY_DOTS, STORY_TOTAL, evenOrder, exact, panOf, rebuild, reducedMotion, snoise, stage, storyLanded } from '../voxel.js';
 import { play } from '../sound.js';
 
 // Everything here is read live every frame, so the ?tune panel (tune.js) can change it on the fly.
@@ -348,6 +348,7 @@ vec4 ripple(vec3 d) {
 void main() {
   vec3 pos;
   vColor = uColor;
+  markKey = vec4(aPos, aSeed);   // for a callout (markKey in orb.js)
   float looseDim = 1.0;
   float fade = 1.0;
   float heat = 0.0;          // slot-in flash
@@ -875,16 +876,21 @@ function marks() {
   return out;
 }
 
-// Where shell square i sits at engine time t, as pose() has it (without its faint idle drift).
+// Where shell square i sits at engine time t, as the shader draws it: with its faint idle drift and
+// the orb's breath and turn (but not the ripples, too small to see).
 function markAt(i, t) {
   const seed = placed[i * 4 + 3];
   if (!(seed < 1)) return null;
-  const reach = (1 + (seed - 0.5) * 0.04) * breath;
+  const idle = snoise(placed[i * 4] * 2, placed[i * 4 + 1] * 2 + t * 0.2, placed[i * 4 + 2] * 2) * 0.012;
+  const reach = (1 + (seed - 0.5) * 0.04 + idle) * breath;
   const [x, y, z] = spun([0, 1, 2].map((k) => placed[i * 4 + k] * reach), spinAngle + (t - lastT) * CONFIG.spin);
   const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt);
   const py = y * ct - z * st, pz = y * st + z * ct;
   return [x, py, pz, (pz / Math.hypot(x, py, pz) + 1) / 2, 1];
 }
+
+// Square i as the shader knows it, for lighting it up (markKey in the shader): its aPos and aSeed.
+const markKey = (i) => Array.from(placed.subarray(i * 4, i * 4 + 4));
 
 // ---------- pressing the ball: draw in the falling dots, pause spawning ----------
 
@@ -1294,6 +1300,7 @@ const orb = {
   pose,
   marks,
   markAt,
+  markKey,
   onDrop,
   look,
   // Morphed into, it arrives whole with its orbits up (the intro and the launch play once per visit,

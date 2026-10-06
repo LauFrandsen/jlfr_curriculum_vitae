@@ -10,8 +10,7 @@
   --line: rgba(17, 16, 15, 0.13);
   --line-strong: rgba(17, 16, 15, 0.42);
   --chip-bg: rgba(255, 255, 255, 0.5);
-  --signal: #6b4ba1;                  /* callouts: a muted violet that sits with the ink */
-  --signal-glow: rgba(107, 75, 161, 0.45);
+  --signal: #6b4ba1;                  /* callouts: a muted violet that sits with the ink (voxel.js reads it too) */
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --gutter: 16px;
@@ -256,9 +255,9 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   50% { transform: translateY(6px); opacity: 1; }
 }
 
-/* Callouts (callouts.js): a square of the graphic blinks and lights up in --signal and draws a line
-   out to a small window with one of the skills, like the hero's links. Over the graphic, under the
-   text; callouts.js places and fades each part every frame. */
+/* Callouts (callouts.js): a square of the graphic turns --signal (the graphic draws that) and a line
+   draws out from it to a small window with one of the skills, like the hero's links. Over the
+   graphic, under the text; callouts.js places and fades both every frame. */
 .callout {
   position: fixed;
   inset: 0;
@@ -273,13 +272,6 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   overflow: visible;
 }
 .callout line { stroke: var(--signal); stroke-width: 1; }
-.callout-dot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  background: var(--signal);
-  will-change: transform, opacity;
-}
 .callout-box {
   position: absolute;
   left: 0;
@@ -288,11 +280,20 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   border: 1px solid var(--line-strong);
   background: var(--raised);
   color: var(--ink);
+  display: grid;
+  gap: 0.15rem;
   font-family: var(--mono);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   white-space: nowrap;
   will-change: transform, opacity;
+}
+/* Its category, small over the skill, like the skill groups' headings. */
+.callout-kind {
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 /* Sound: a small square window in the bottom-right corner, like the hero's links, there all the way

@@ -1,17 +1,18 @@
-// Callouts: now and then a square of the graphic blinks purple, lights up and draws a line out to a
-// small window with one of the CV's skills; and the same on the square the mouse has rested on for two
-// seconds. The squares, and where they are, come from the graphic (voxel.js: marks, markAt); the
-// skills from the page's chips. Drawn over the graphic and under the text, and only while the graphic
-// is in the hero or resting beside the CV: not on a phone's horizon, nor beside a project pane.
+// Callouts: now and then a square of the graphic blinks purple, turns purple and grows a little, and
+// a line draws out from it to a small window with one of the CV's skills; and the same on the square
+// the mouse has rested on for two seconds. The square itself changes (the graphic draws it, so it
+// moves as it does: voxel.js setMark), and the line follows it (marks, markAt); the skills come from
+// the page's chips. The line and window go over the graphic and under the text, and only while the
+// graphic is in the hero or resting beside the CV: not on a phone's horizon, nor beside a project pane.
 
-import { markAt, marks, reducedMotion, stage } from './voxel.js';
+import { clearMark, markAt, marks, reducedMotion, setMark, stage } from './voxel.js';
 import { play } from './sound.js';
 
 const EVERY = [12, 24];   // seconds between callouts that come on their own (at random in between)
 const FIRST = 6;          // seconds before the first, once the graphic has settled
 const HOVER_MS = 2000;    // the mouse resting on a square this long calls one out there
 const HOLD_MS = 3800;     // how long a window stays (one the mouse called: while the mouse stays near)
-// A callout's steps, in ms from its start: two blinks, lighting up, the line drawing out, the window
+// A callout's steps, in ms from its start: two blinks, growing, the line drawing out, the window
 // opening; and how long it takes to fade away at the end.
 const STEP = { blinks: 480, lit: 900, line: 1300, open: 1600, out: 600 };
 
@@ -20,18 +21,28 @@ const clamp = (x, lo, hi) => Math.min(Math.max(x, lo), hi);
 
 // ---------- what to say ----------
 
-// The CV's skills (its chips, the short ones) and languages.
+// The CV's skills (its chips, the short ones) and languages, each with its category, so a skill like
+// "Windows" reads right: a chip's own data-category, or the heading of its skill group, or its list's
+// label ("Specialised in", "Technologies"). A skill listed twice takes the category from the skill
+// groups. As [{ kind, skill }].
 function sayings() {
-  const out = new Set();
-  for (const li of document.querySelectorAll('.chips li')) {
-    const text = li.textContent.trim();
-    if (text.length <= 28) out.add(text);
+  const out = new Map();   // skill → category
+  const chips = [...document.querySelectorAll('.skill-group .chips li'), ...document.querySelectorAll('.chips li')];
+  for (const li of chips) {
+    const skill = li.textContent.trim();
+    if (skill.length > 28 || out.has(skill)) continue;
+    out.set(skill, li.dataset.category
+      || li.closest('.skill-group')?.querySelector('h3')?.textContent.trim()
+      || li.closest('.chips')?.getAttribute('aria-label')
+      || '');
   }
-  for (const li of document.querySelectorAll('.languages li')) {
+  const languages = document.querySelector('.languages');
+  const heading = languages?.previousElementSibling?.textContent.trim() || 'Languages';
+  for (const li of languages?.querySelectorAll('li') ?? []) {
     const name = li.querySelector('strong')?.textContent, level = li.querySelector('span')?.textContent;
-    if (name && level) out.add(`${name} · ${level.toLowerCase()}`);
+    if (name && level) out.set(`${name} · ${level.toLowerCase()}`, heading);
   }
-  return [...out];
+  return [...out].map(([skill, kind]) => ({ kind, skill }));
 }
 
 // One at a time, each once before any comes round again.
@@ -44,7 +55,17 @@ function saying() {
       [bag[i], bag[j]] = [bag[j], bag[i]];
     }
   }
-  return bag.pop() ?? '';
+  return bag.pop() ?? { kind: '', skill: '' };
+}
+
+// Writes a saying into a window: its category over the skill.
+function fill(el, { kind, skill }) {
+  const label = document.createElement('span'), text = document.createElement('span');
+  label.className = 'callout-kind';
+  label.textContent = kind;
+  text.className = 'callout-skill';
+  text.textContent = skill;
+  el.replaceChildren(...(kind ? [label] : []), text);
 }
 
 // ---------- the layer ----------
@@ -53,9 +74,9 @@ const layer = document.createElement('div');
 layer.className = 'callout';
 layer.setAttribute('aria-hidden', 'true');   // the skills are in the CV itself
 layer.hidden = true;
-layer.innerHTML = '<svg><line></line></svg><span class="callout-dot"></span><span class="callout-box"></span>';
+layer.innerHTML = '<svg><line></line></svg><span class="callout-box"></span>';
 document.getElementById('voxel-canvas')?.after(layer);   // before the text, so the text stays on top
-const line = layer.querySelector('line'), dot = layer.querySelector('.callout-dot'), box = layer.querySelector('.callout-box');
+const line = layer.querySelector('line'), box = layer.querySelector('.callout-box');
 
 // A hidden copy of the window, to measure one before it shows.
 const ruler = document.createElement('span');
@@ -63,8 +84,8 @@ ruler.className = 'callout-box';
 ruler.setAttribute('aria-hidden', 'true');
 ruler.style.visibility = 'hidden';
 document.body.append(ruler);
-function measure(text) {
-  ruler.textContent = text;
+function measure(said) {
+  fill(ruler, said);
   return { w: ruler.offsetWidth, h: ruler.offsetHeight };
 }
 
@@ -107,15 +128,15 @@ function place(m, g, w, h) {
 
 // ---------- showing one ----------
 
-let current = null;   // the callout showing: { index, start, mouse, size, at, ending, away }
+let current = null;   // the callout showing: { index, start, mouse, size, at, ending, away, gone }
 let looping = false;
 
-function show(index, text, mouse = false) {
+function show(index, said, mouse = false) {
   const at = markAt(index);
   if (!at) return;
   const now = performance.now();
-  box.textContent = text;
-  current = { index, start: reducedMotion.matches ? now - STEP.open : now, mouse, size: measure(text), at, ending: 0, away: 0 };
+  fill(box, said);
+  current = { index, start: reducedMotion.matches ? now - STEP.open : now, mouse, size: measure(said), at, ending: 0, away: 0 };
   layer.hidden = false;
   play('callout', { pan: (at.x / innerWidth) * 2 - 1 });
   if (!looping) {
@@ -127,6 +148,7 @@ function show(index, text, mouse = false) {
 function tick(now) {
   const c = current;
   const m = c && markAt(c.index);
+  if (c && !m) c.gone = true;   // its square is gone (its petal broke off, a morph): it lets go at once
   if (c && !c.ending) {
     if (!m || !allowed()) {
       c.ending = now;   // its square is gone, or the graphic has moved on
@@ -144,27 +166,29 @@ function tick(now) {
     if (c === current) current = null;
     looping = false;
     layer.hidden = true;
+    clearMark();
     return;
   }
   const at = (c.at = m ?? c.at), e = now - c.start, fade = 1 - ease(out);
 
-  // The square: two purple blinks, then lit, its glow swelling.
+  // The square itself: two purple blinks, then purple, growing a little. Once it's gone (a broken
+  // petal falling away) it's plain ink again straight away; only the line and window fade.
   const blink = e < STEP.blinks && Math.floor(e / 120) % 2 === 1 ? 0 : 1;
-  const lit = ease((e - STEP.blinks) / (STEP.lit - STEP.blinks));
-  const side = Math.max(3, at.size * (1.6 + 0.6 * lit));
-  dot.style.width = dot.style.height = `${side}px`;
-  dot.style.transform = `translate(${at.x - side / 2}px, ${at.y - side / 2}px)`;
-  dot.style.opacity = String(blink * fade);
-  dot.style.boxShadow = `0 0 ${4 + 14 * lit}px ${1 + 5 * lit}px var(--signal-glow)`;
+  const grow = ease((e - STEP.blinks) / (STEP.lit - STEP.blinks));
+  if (c.gone) clearMark();
+  else setMark(c.index, blink * fade, grow * fade);
 
-  // The line drawing out from it to the window, and the window opening at its end.
+  // The line drawing out from its edge to the window, and the window opening at its end.
   const { left, top } = place(at, graphic(), c.size.w, c.size.h);
   const tx = clamp(at.x, left, left + c.size.w), ty = clamp(at.y, top, top + c.size.h);
+  const span = Math.hypot(tx - at.x, ty - at.y) || 1;
+  const edge = Math.min(span, (at.size * (1 + 0.35 * grow)) / 2 + 2);
+  const sx = at.x + ((tx - at.x) / span) * edge, sy = at.y + ((ty - at.y) / span) * edge;
   const drawn = ease((e - STEP.lit) / (STEP.line - STEP.lit)) * fade;
-  line.setAttribute('x1', at.x);
-  line.setAttribute('y1', at.y);
-  line.setAttribute('x2', at.x + (tx - at.x) * drawn);
-  line.setAttribute('y2', at.y + (ty - at.y) * drawn);
+  line.setAttribute('x1', sx);
+  line.setAttribute('y1', sy);
+  line.setAttribute('x2', sx + (tx - sx) * drawn);
+  line.setAttribute('y2', sy + (ty - sy) * drawn);
   const opened = ease((e - STEP.line) / (STEP.open - STEP.line)) * fade;
   box.style.opacity = String(opened);
   box.style.transform = `translate(${left}px, ${top + (1 - opened) * 4}px)`;
@@ -189,9 +213,9 @@ function choose(all, w, h) {
 export function callOut() {
   const all = marks();
   if (!all.length) return false;
-  const text = saying(), { w, h } = measure(text), i = choose(all, w, h);
+  const said = saying(), { w, h } = measure(said), i = choose(all, w, h);
   if (i < 0) return false;
-  show(i, text);
+  show(i, said);
   return true;
 }
 

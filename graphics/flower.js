@@ -167,6 +167,7 @@ vec3 climb(float q, float a, vec3 e, vec3 target, float r) {
 void main() {
   float part = aInfo.x, r = aInfo.z;
   vColor = uColor;
+  markKey = vec4(aTarget, r);   // for a callout (markKey in flower.js)
   vec3 pos = aTarget;
   float fade = 1.0, heat = 0.0, ink = 1.0;
   vec2 start = vec2(0.0);
@@ -710,6 +711,13 @@ function markAt(i, t) {
   return [x, y, z, Math.min(1, Math.max(0, 0.55 + z * 0.9)), 1];
 }
 
+// Square i as the shader knows it, for lighting it up (markKey in the shader): where it sits and its
+// random value.
+function markKey(i) {
+  const sq = squares?.[i];
+  return sq ? [sq[0], sq[1], sq[2], sq[7]] : null;
+}
+
 // ---------- tapping a petal off ----------
 
 // The whole petal under a point on the canvas (device px), if any: the nearest whose line from base
@@ -746,6 +754,7 @@ export default {
   pose,
   marks,
   markAt,
+  markKey,
   settle,
   press: () => {
     gust = 1;
