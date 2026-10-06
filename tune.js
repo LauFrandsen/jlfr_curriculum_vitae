@@ -5,6 +5,7 @@
 
 import { current, getStats, next } from './voxel.js';
 import { SOUND, SOUNDS, play, setSound, soundOn } from './sound.js';
+import { callOut } from './callouts.js';
 
 const SHARED = [
   { group: 'Squares', colors: true },
@@ -138,6 +139,7 @@ function open(graphic) {
     });
   }
   button('Next graphic', () => next());
+  button('Callout', () => callOut());
   button('Copy values', async (b) => {
     const round = (c) => c.map((v) => +v.toFixed(3));
     const text = JSON.stringify({ ...CONFIG, color: round(CONFIG.color), burnColor: round(CONFIG.burnColor) }, null, 2);

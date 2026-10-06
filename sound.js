@@ -344,6 +344,14 @@ export const SOUNDS = {
     hiss(s, { freq: 350, to: 1100, attack: 0.04, decay: 0.3, gain: 0.08 }),
     tone(s, { freq: 98, to: 73, attack: 0.02, decay: 0.3, gain: 0.07 }),
   ),
+  // A square calling out a skill (callouts.js): two soft, low blinks, a warm swell as it lights up,
+  // and a quiet knock as the box appears.
+  callout: (s) => Math.max(
+    tone(s, { freq: 220, attack: 0.01, decay: 0.08, gain: 0.04 }),
+    tone(s, { at: 0.24, freq: 220, attack: 0.01, decay: 0.08, gain: 0.04 }),
+    hum(s, { at: 0.48, freqs: [110, 164.81], cutoff: 250, to: 700, glide: 0.5, attack: 0.25, decay: 1.2, gain: 0.02 }),
+    tone(s, { at: 1.3, type: 'triangle', freq: 329.63, attack: 0.004, decay: 0.12, gain: 0.03 }),
+  ),
   // Sound turned on: two low notes going up.
   on: (s) => Math.max(
     tone(s, { freq: 110, attack: 0.02, decay: 0.9, gain: 0.12 }),

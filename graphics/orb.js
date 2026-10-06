@@ -861,6 +861,31 @@ function pose(t) {
   return new Float32Array(out);
 }
 
+// ---------- callouts: the squares one may point at ----------
+
+// Shell squares on the front of the orb (as it's turned now), once the intro is over.
+function marks() {
+  if (introTime < introEnd()) return [];
+  const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt), out = [];
+  for (let i = STORY_TOTAL; i < placed.length / 4; i++) {
+    if (placed[i * 4 + 3] >= 1) continue;
+    const [, y, z] = spun([placed[i * 4], placed[i * 4 + 1], placed[i * 4 + 2]], spinAngle);
+    if (y * st + z * ct > 0.35) out.push(i);
+  }
+  return out;
+}
+
+// Where shell square i sits at engine time t, as pose() has it (without its faint idle drift).
+function markAt(i, t) {
+  const seed = placed[i * 4 + 3];
+  if (!(seed < 1)) return null;
+  const reach = (1 + (seed - 0.5) * 0.04) * breath;
+  const [x, y, z] = spun([0, 1, 2].map((k) => placed[i * 4 + k] * reach), spinAngle + (t - lastT) * CONFIG.spin);
+  const ct = Math.cos(CONFIG.tilt), st = Math.sin(CONFIG.tilt);
+  const py = y * ct - z * st, pz = y * st + z * ct;
+  return [x, py, pz, (pz / Math.hypot(x, py, pz) + 1) / 2, 1];
+}
+
 // ---------- pressing the ball: draw in the falling dots, pause spawning ----------
 
 // In flow-time units. Cycles starting within [start, end) are skipped; dots mid-fall at `start` are drawn in.
@@ -1267,6 +1292,8 @@ const orb = {
   build,
   frame,
   pose,
+  marks,
+  markAt,
   onDrop,
   look,
   // Morphed into, it arrives whole with its orbits up (the intro and the launch play once per visit,

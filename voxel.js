@@ -23,6 +23,8 @@
 //               the ink, size and boost it passes to emit().
 //   Optional: settle() (put itself in its finished state before it's morphed into, e.g. fully grown),
 //   replay() (play its opening again, so it's heard when sound is turned on),
+//   marks() and markAt(i, t) (the squares a callout may point at, as indices in its data, once it's
+//   settled; and where square i sits at engine time t: x, y, z, depth and size, as in a pose),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
 //   over(at) and
 //   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
@@ -985,10 +987,39 @@ export function current() {
 
 // Where the graphic sits on the canvas, in device px: its centre, its radius and the canvas size; how
 // far it has glided from the hero to its rest (0..1); and in the hero, how far below its centre the
-// text it should keep clear of starts ([data-voxel-clear]). For graphics that fit themselves to the
-// room around them.
+// text it should keep clear of starts ([data-voxel-clear]); and how far it has glided to a project pane
+// (focus, 0..1). For graphics that fit themselves to the room around them, and for callouts.
 export function stage() {
-  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear };
+  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear, focus };
+}
+
+// ---------- marks: single squares, for callouts.js ----------
+
+// The squares of the graphic shown that a callout may point at (indices in its data): none while
+// morphing, and only squares being drawn.
+export function marks() {
+  if (!shown || morph) return [];
+  const drawn = activeOf(shown);
+  return (shown.graphic.marks?.() ?? []).filter((i) => i < drawn);
+}
+
+// Where square i (one of marks()) sits on screen now, as the shader draws it at rest, pulled toward
+// the pointer as emit() has it: { x, y, size (its solid square), depth }, in CSS px. Null once it's
+// gone (a morph, a petal breaking off).
+export function markAt(i) {
+  if (!shown || morph) return null;
+  const g = shown.graphic, p = g.markAt?.(i, last);
+  if (!p) return null;
+  const [x, y, z, depth, size] = p, C = g.CONFIG;
+  const s = C.cameraDistance / (C.cameraDistance - z);
+  let sx = cx + x * radius * s, sy = cy - y * radius * s;
+  const px = pointer.x * dpr - sx, py = pointer.y * dpr - sy;
+  const w = 1 - Math.min(1, Math.hypot(px, py) / (radius * C.pullRadius));
+  const pull = w * w * (3 - 2 * w) * (0.35 + 0.65 * depth) * pointer.strength * C.pullStrength;
+  sx += px * pull;
+  sy += py * pull;
+  const sprite = C.dotSize * radius * 2 * s * (0.55 + 0.65 * depth) * size;
+  return { x: sx / dpr, y: sy / dpr, size: (sprite * C.squareSize) / dpr, depth };
 }
 
 // Where a point x stage units right of the graphic's centre sits across the screen, from -1 (the left

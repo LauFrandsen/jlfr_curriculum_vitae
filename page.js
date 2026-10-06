@@ -1,8 +1,10 @@
 // Page behaviour around the graphic: picking it, section reveals, CV entries sending their squares
-// into it, project panes, the scroll cue, the PDF button and the sound button.
+// into it, project panes, the scroll cue, the PDF button and the sound button. (callouts.js runs the
+// graphic's callouts on its own.)
 
 import { current, dropFrom, reducedMotion, setFocus, start } from './voxel.js';
 import { play, setSound, soundOn } from './sound.js';
+import './callouts.js';
 
 // A graphic of ink squares, picked at random on each visit (?graphic=orb or flower picks one), which
 // morphs into the next one in the list every few minutes of the page being on screen.
