@@ -10,6 +10,7 @@
   --line: rgba(17, 16, 15, 0.13);
   --line-strong: rgba(17, 16, 15, 0.42);
   --chip-bg: rgba(255, 255, 255, 0.5);
+  --signal: #6b4ba1;                  /* callouts: a muted violet that sits with the ink (voxel.js reads it too) */
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --gutter: 16px;
@@ -254,6 +255,56 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   50% { transform: translateY(6px); opacity: 1; }
 }
 
+/* Callouts (callouts.js): a square of the graphic turns --signal (the graphic draws that) and a line
+   draws out from it to a small window with one of the skills, like the hero's links. Over the
+   graphic, under the text; callouts.js places and fades both every frame. */
+.callout {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.callout svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.callout line { stroke: var(--signal); stroke-width: 1; }
+.callout-box {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  background: var(--raised);
+  color: var(--ink);
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: inherit;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  will-change: transform, opacity;
+}
+.callout-box:hover { border-color: var(--signal); }
+/* Its category, small over the skill, like the skill groups' headings; a project's place and dates
+   under its name. */
+.callout-kind {
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.callout-note { color: var(--muted); font-size: 0.62rem; }
+
 /* Sound: a small square window in the bottom-right corner, like the hero's links, there all the way
    down the page. Off (a crossed speaker) until it's pressed; only with JS, which makes the sound. */
 .sound-button {
@@ -398,7 +449,17 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   font-size: 0.8rem;
   line-height: 1.5;
   text-shadow: none;
+  transition: border-color 0.6s, color 0.6s, background-color 0.6s;
 }
+/* A skill a callout's window was clicked for (callouts.js), picked out for a moment. */
+.chips li.found {
+  border-color: var(--signal);
+  background: rgba(107, 75, 161, 0.08);
+  color: var(--signal);
+}
+.languages li strong, .trait h3, .project-open { transition: color 0.6s; }
+.languages li.found strong, .trait.found h3, .project.found .project-open { color: var(--signal); }
+.project.found { border-color: var(--signal); }
 .chips-small { margin-top: 1rem !important; }
 .chips-small li { font-size: 0.75rem; padding: 0.16rem 0.5rem; }
 
@@ -756,7 +817,7 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .callout, .callout-box, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }

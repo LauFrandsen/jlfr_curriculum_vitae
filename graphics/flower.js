@@ -167,6 +167,7 @@ vec3 climb(float q, float a, vec3 e, vec3 target, float r) {
 void main() {
   float part = aInfo.x, r = aInfo.z;
   vColor = uColor;
+  markKey = vec4(aTarget, r);   // for a callout (markKey in flower.js)
   vec3 pos = aTarget;
   float fade = 1.0, heat = 0.0, ink = 1.0;
   vec2 start = vec2(0.0);
@@ -687,6 +688,36 @@ function pose(t) {
   return new Float32Array(out);
 }
 
+// ---------- callouts: the squares one may point at ----------
+
+// The flower itself, once it's in full bloom: the head, whole petals, the leaves and the stem above
+// the ground.
+function marks() {
+  if (!bloomed || !squares) return [];
+  const out = [];
+  squares.forEach(([, y0, , , , part, info], i) => {
+    if (part === HEAD || part === LEAF || (part === STEM && y0 > GROUND + 0.05) || (part === PETAL && whole(petals[info]))) out.push(i);
+  });
+  return out;
+}
+
+// Where square i sits at engine time t, as pose() has it; null once its petal has broken off.
+function markAt(i, t) {
+  const sq = squares?.[i];
+  if (!sq) return null;
+  const [x0, y0, z0, , , part, info] = sq;
+  if (part === SOIL || part === ROOT || part === STORY || (part === PETAL && !whole(petals[info]))) return null;
+  const [x, y, z] = inView([x0, y0, z0], windAt(t));
+  return [x, y, z, Math.min(1, Math.max(0, 0.55 + z * 0.9)), 1];
+}
+
+// Square i as the shader knows it, for lighting it up (markKey in the shader): where it sits and its
+// random value.
+function markKey(i) {
+  const sq = squares?.[i];
+  return sq ? [sq[0], sq[1], sq[2], sq[7]] : null;
+}
+
 // ---------- tapping a petal off ----------
 
 // The whole petal under a point on the canvas (device px), if any: the nearest whose line from base
@@ -721,6 +752,9 @@ export default {
   build,
   frame,
   pose,
+  marks,
+  markAt,
+  markKey,
   settle,
   press: () => {
     gust = 1;

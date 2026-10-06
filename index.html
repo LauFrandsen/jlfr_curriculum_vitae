@@ -14,13 +14,14 @@
   <!-- Each file is loaded under the site's version (set by tools/version.mjs when publishing), so a
        browser never mixes cached files from one publish with fresh ones from the next. -->
   <script type="importmap">{"imports": {
-    "./voxel.js": "./voxel.js?v=e4a6bfd59e",
-    "./tune.js": "./tune.js?v=e4a6bfd59e",
-    "./sound.js": "./sound.js?v=e4a6bfd59e",
-    "./graphics/orb.js": "./graphics/orb.js?v=e4a6bfd59e",
-    "./graphics/flower.js": "./graphics/flower.js?v=e4a6bfd59e"
+    "./voxel.js": "./voxel.js?v=50fef59e17",
+    "./tune.js": "./tune.js?v=50fef59e17",
+    "./sound.js": "./sound.js?v=50fef59e17",
+    "./callouts.js": "./callouts.js?v=50fef59e17",
+    "./graphics/orb.js": "./graphics/orb.js?v=50fef59e17",
+    "./graphics/flower.js": "./graphics/flower.js?v=50fef59e17"
   }}</script>
-  <link rel="stylesheet" href="style.css?v=e4a6bfd59e">
+  <link rel="stylesheet" href="style.css?v=50fef59e17">
   <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
@@ -223,7 +224,7 @@
         <div class="skill-group">
           <h3>Systems &amp; security</h3>
           <ul class="chips">
-            <li>Linux</li><li>Windows</li><li>macOS</li><li>Information security fundamentals</li>
+            <li data-category="Operating systems">Linux</li><li data-category="Operating systems">Windows</li><li data-category="Operating systems">macOS</li><li>Information security fundamentals</li>
           </ul>
         </div>
       </div>
@@ -295,6 +296,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="page.js?v=e4a6bfd59e"></script>
+  <script type="module" src="page.js?v=50fef59e17"></script>
 </body>
 </html>

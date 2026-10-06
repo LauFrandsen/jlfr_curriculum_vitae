@@ -23,6 +23,9 @@
 //               the ink, size and boost it passes to emit().
 //   Optional: settle() (put itself in its finished state before it's morphed into, e.g. fully grown),
 //   replay() (play its opening again, so it's heard when sound is turned on),
+//   marks(), markAt(i, t) and markKey(i) (the squares a callout may point at, as indices in its
+//   data, once it's settled; where square i sits at engine time t: x, y, z, depth and size, as in a
+//   pose; and the four numbers its shader sets markKey to for that square, so it can light it up),
 //   press(), focus(on), onDrop(entry, time), halo() (strength of the paper's scorch behind it),
 //   over(at) and
 //   tap(at) for targets of its own (at = a point on the canvas in device px; over says whether one is
@@ -49,6 +52,9 @@ export const STORY_TOTAL = STORY_ENTRIES * STORY_DOTS;
 
 // Numbers per square in a graphic's pose(): x, y, z, depth, ink, size, boost.
 export const POSE = 7;
+
+// Squares a callout can light up at once (callouts.js: a project lights several).
+export const MARKS = 6;
 
 // The morph from one graphic to the next, in seconds: the old one fades into the travelling squares,
 // each square sets off within SPREAD (bottom first) and travels for TRAVEL, and the new one fades in
@@ -109,6 +115,49 @@ float snoise(vec3 v){
   return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
 }`;
 
+// The same noise in JavaScript (NOISE's snoise, step for step), so a graphic can tell where a square
+// that drifts with it is.
+export function snoise(vx, vy, vz) {
+  const mod289 = (x) => x - Math.floor(x * (1 / 289)) * 289;
+  const permute = (x) => mod289((x * 34 + 1) * x);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const lift = (vx + vy + vz) / 3;
+  const i = [Math.floor(vx + lift), Math.floor(vy + lift), Math.floor(vz + lift)];
+  const back = (i[0] + i[1] + i[2]) / 6;
+  const x0 = [vx - i[0] + back, vy - i[1] + back, vz - i[2] + back];
+  const g = [x0[0] >= x0[1] ? 1 : 0, x0[1] >= x0[2] ? 1 : 0, x0[2] >= x0[0] ? 1 : 0];
+  const l = g.map((v) => 1 - v);
+  const i1 = [Math.min(g[0], l[2]), Math.min(g[1], l[0]), Math.min(g[2], l[1])];
+  const i2 = [Math.max(g[0], l[2]), Math.max(g[1], l[0]), Math.max(g[2], l[1])];
+  const x1 = x0.map((v, k) => v - i1[k] + 1 / 6);
+  const x2 = x0.map((v, k) => v - i2[k] + 1 / 3);
+  const x3 = x0.map((v) => v - 0.5);
+  const m289 = i.map(mod289);
+  const offsets = (k) => [0, i1[k], i2[k], 1];
+  const p = [0, 1, 2, 3].map((c) =>
+    permute(permute(permute(m289[2] + offsets(2)[c]) + m289[1] + offsets(1)[c]) + m289[0] + offsets(0)[c]));
+  const n = 0.142857142857, ns = [n * 2, n * 0.5 - 1, n];
+  const j = p.map((v) => v - 49 * Math.floor(v * ns[2] * ns[2]));
+  const xr = j.map((v) => Math.floor(v * ns[2]));
+  const yr = j.map((v, k) => Math.floor(v - 7 * xr[k]));
+  const x = xr.map((v) => v * ns[0] + ns[1]), y = yr.map((v) => v * ns[0] + ns[1]);
+  const h = [0, 1, 2, 3].map((k) => 1 - Math.abs(x[k]) - Math.abs(y[k]));
+  const b0 = [x[0], x[1], y[0], y[1]], b1 = [x[2], x[3], y[2], y[3]];
+  const sh = h.map((v) => (v <= 0 ? -1 : 0));
+  const swz = [0, 2, 1, 3];
+  const a0 = swz.map((k, c) => b0[k] + (Math.floor(b0[k]) * 2 + 1) * sh[c < 2 ? 0 : 1]);
+  const a1 = swz.map((k, c) => b1[k] + (Math.floor(b1[k]) * 2 + 1) * sh[c < 2 ? 2 : 3]);
+  const grads = [[a0[0], a0[1], h[0]], [a0[2], a0[3], h[1]], [a1[0], a1[1], h[2]], [a1[2], a1[3], h[3]]];
+  const xs = [x0, x1, x2, x3];
+  let sum = 0;
+  for (let k = 0; k < 4; k++) {
+    const norm = 1.79284291400159 - 0.85373472095314 * dot(grads[k], grads[k]);
+    const m = Math.max(0.6 - dot(xs[k], xs[k]), 0) ** 2;
+    sum += m * m * norm * dot(grads[k], xs[k]);
+  }
+  return 42 * sum;
+}
+
 // Shared GLSL at the top of every vertex shader. Positions are in "stage" units: the radius of the
 // box the graphic is placed in, with y up and z toward the viewer.
 const COMMON = `
@@ -122,6 +171,13 @@ uniform vec3 uStoryColor[${STORY_ENTRIES}];
 uniform float uStoryFall, uStoryGlow, uStoryIntegrate;
 uniform float uClipY, uClipFade;         // the horizon: clipped squares fade out above uClipY (device px)
 uniform vec3 uColor;
+uniform vec4 uMarks[${MARKS}];       // a callout's squares (callouts.js): the markKey of each square it lights,
+uniform vec2 uMarkStates[${MARKS}];  // how far each has taken on uMarkColor (x) and grown (y), 0..1
+uniform vec3 uMarkColor;
+
+// Which square this is, for a callout: each graphic sets it from its own data (e.g. its position and
+// random value) before emit(), the same four numbers its markKey(i) gives JavaScript.
+vec4 markKey = vec4(1e9);
 
 varying float vAlpha;
 varying float vHalf;     // half-width of the solid square, in sprite units (sprite edge = 1)
@@ -209,6 +265,15 @@ bool story(float idx, out float fall, out vec2 start, out float heat, out float 
 //   size       multiplies the sprite
 //   clip       false exempts it from the horizon's clip (story squares falling through it)
 void emit(vec2 screen, float s, float depth, float rim, float heat, float ink, float boost, float size, bool clip) {
+  // A callout's square takes on its colour, a little stronger, and grows a little as it lights.
+  vec2 mark = vec2(0.0);
+  for (int i = 0; i < ${MARKS}; i++) {
+    if (distance(markKey, uMarks[i]) < 1e-5) mark = uMarkStates[i];
+  }
+  vColor = mix(vColor, uMarkColor, mark.x);
+  boost += 0.3 * mark.x;
+  size *= 1.0 + 0.35 * mark.y;
+
   // Pull toward the pointer, strongest for close squares at the front.
   vec2 toPointer = uPointer - screen;
   float w = 1.0 - clamp(length(toPointer) / (uRadius * uPullRadius), 0.0, 1.0);
@@ -780,6 +845,10 @@ function drawGraphic(layer, fade, t, dt) {
   layer.graphic.frame({ t, dt, set, activeCount: activeOf(layer) });
   framing = null;
   setShared(layer.graphic.CONFIG, fade);
+  const marked = layer === shown && !morph;
+  set('uMarks', marked ? mark.keys : NO_MARKS);
+  set('uMarkStates', marked ? mark.states : NO_STATES);
+  set('uMarkColor', mark.color);
   gl.drawArrays(gl.POINTS, 0, activeOf(layer));
 }
 
@@ -985,10 +1054,63 @@ export function current() {
 
 // Where the graphic sits on the canvas, in device px: its centre, its radius and the canvas size; how
 // far it has glided from the hero to its rest (0..1); and in the hero, how far below its centre the
-// text it should keep clear of starts ([data-voxel-clear]). For graphics that fit themselves to the
-// room around them.
+// text it should keep clear of starts ([data-voxel-clear]); and how far it has glided to a project pane
+// (focus, 0..1). For graphics that fit themselves to the room around them, and for callouts.
 export function stage() {
-  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear };
+  return { x: cx, y: cy, radius, width: canvas.width, height: canvas.height, scale: dpr, recede, clearBelow: heroClear, focus };
+}
+
+// ---------- marks: single squares, for callouts.js ----------
+
+// The squares of the graphic shown that a callout may point at (indices in its data): none while
+// morphing, and only squares being drawn.
+export function marks() {
+  if (!shown || morph) return [];
+  const drawn = activeOf(shown);
+  return (shown.graphic.marks?.() ?? []).filter((i) => i < drawn);
+}
+
+// The squares a callout lights up, as the shaders see them (uMarks, uMarkStates): each one's markKey,
+// and how far it has taken on the callout's colour (--signal in the CSS) and grown. Far away when
+// unused.
+const NO_MARKS = new Float32Array(MARKS * 4).fill(1e9), NO_STATES = new Float32Array(MARKS * 2);
+const mark = { keys: NO_MARKS.slice(), states: NO_STATES.slice(), color: [0.42, 0.29, 0.63] };
+{
+  const css = parseHex(getComputedStyle(document.documentElement).getPropertyValue('--signal'));
+  if (css) mark.color = css;
+}
+
+// Lights up squares of the graphic shown: a list of up to MARKS [i (one of marks()), lit, grow], lit
+// being how far it has taken on the callout's colour and grow how far it has grown, both 0..1. Squares
+// left out (or setMarks([])) go back to ink.
+export function setMarks(list) {
+  mark.keys.set(NO_MARKS);
+  mark.states.set(NO_STATES);
+  list.slice(0, MARKS).forEach(([i, lit, grow], k) => {
+    const key = shown?.graphic.markKey?.(i);
+    if (!key) return;
+    mark.keys.set(key, k * 4);
+    mark.states.set([lit, grow], k * 2);
+  });
+}
+
+// Where square i (one of marks()) sits on screen now, as the shader draws it at rest, pulled toward
+// the pointer as emit() has it: { x, y, size (its solid square), depth }, in CSS px. Null once it's
+// gone (a morph, a petal breaking off).
+export function markAt(i) {
+  if (!shown || morph) return null;
+  const g = shown.graphic, p = g.markAt?.(i, last);
+  if (!p) return null;
+  const [x, y, z, depth, size] = p, C = g.CONFIG;
+  const s = C.cameraDistance / (C.cameraDistance - z);
+  let sx = cx + x * radius * s, sy = cy - y * radius * s;
+  const px = pointer.x * dpr - sx, py = pointer.y * dpr - sy;
+  const w = 1 - Math.min(1, Math.hypot(px, py) / (radius * C.pullRadius));
+  const pull = w * w * (3 - 2 * w) * (0.35 + 0.65 * depth) * pointer.strength * C.pullStrength;
+  sx += px * pull;
+  sy += py * pull;
+  const sprite = C.dotSize * radius * 2 * s * (0.55 + 0.65 * depth) * size;
+  return { x: sx / dpr, y: sy / dpr, size: (sprite * C.squareSize) / dpr, depth };
 }
 
 // Where a point x stage units right of the graphic's centre sits across the screen, from -1 (the left
