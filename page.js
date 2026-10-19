@@ -3,7 +3,7 @@
 // the graphic's callouts on its own, and tour.js the guided tour.)
 
 import { current, dropFrom, reducedMotion, setFocus, start } from './voxel.js';
-import { play, setSound, soundOn } from './sound.js';
+import { MOTIF_SECONDS, play, setSound, soundOn } from './sound.js';
 import './callouts.js';
 import './tour.js';
 
@@ -85,7 +85,9 @@ if (soundButton) {
   soundButton.addEventListener('click', () => {
     setSound(!soundOn());
     showSound();
-    if (soundOn() && scrollY < innerHeight * 0.3) current()?.replay?.();
+    // In the hero, the graphic plays its opening again so it's heard, once the music's motif has
+    // sounded: the motif, then the opening, the music building out under them.
+    if (soundOn() && scrollY < innerHeight * 0.3) setTimeout(() => { if (soundOn()) current()?.replay?.(); }, MOTIF_SECONDS * 1000);
   });
 }
 
