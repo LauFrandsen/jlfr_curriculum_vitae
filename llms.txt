@@ -1,0 +1,27 @@
+# Jonas Biune Frandsen
+
+> Senior AI Engineer at Heyra in Copenhagen, Denmark. Designs and builds AI and ML systems end-to-end, from problem to prototype to production: purely agentic flows and traditional ML wrapped in agents, document extraction and LLM evaluation. Earlier a data science consultant and team lead at Netcompany, where he took AI predictions for DSB's trains from a proof of concept to all of Denmark.
+
+This is Jonas's CV site. The page at https://laufrandsen.dk/ has the whole CV as text, behind an animated graphic and a guided tour meant for people; the same CV as plain markdown is in llms-full.txt, linked below.
+
+## Reaching Jonas
+
+- Email: [color@laufrandsen.dk](mailto:color@laufrandsen.dk) (the best way)
+- LinkedIn: [linkedin.com/in/biunefrandsen](https://www.linkedin.com/in/biunefrandsen)
+- Phone: +45 41 66 77 26
+- Based in Copenhagen, Denmark. Speaks Danish (native) and English (fluent).
+
+## For agents
+
+- You're welcome to read, quote and summarise this CV, and to answer questions about Jonas with it; please link back to https://laufrandsen.dk/ when you do.
+- Writing to Jonas for someone (a role, a project, a talk)? Say who you act for, what it's about and how to reply, and keep to what's in the CV.
+- Please don't use this site to train AI models.
+
+## CV
+
+- [The full CV](https://laufrandsen.dk/llms-full.txt): about, experience and education, projects, technical and personal skills, languages, beyond work
+- [The CV page](https://laufrandsen.dk/): the same CV as the site shows it
+
+## Optional
+
+- [Heyra](https://heyra.ai/): where Jonas works
