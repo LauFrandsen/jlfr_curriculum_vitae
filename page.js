@@ -47,9 +47,12 @@ const dropper = new IntersectionObserver((entries) => {
 }, { threshold: 0.5, rootMargin: '0px 0px -15% 0px' });
 drops.forEach((el) => dropper.observe(el));
 
-// The Explore button (the guided tour, tour.js) fades once the visitor starts scrolling.
-const explore = document.querySelector('.explore');
-addEventListener('scroll', () => explore?.classList.toggle('hidden', scrollY > 40), { passive: true });
+// The Explore button (the guided tour, tour.js) and See more under it fade once the visitor starts scrolling.
+const explore = document.querySelector('.explore'), cue = document.querySelector('.scroll-cue');
+addEventListener('scroll', () => {
+  explore?.classList.toggle('hidden', scrollY > 40);
+  cue?.classList.toggle('hidden', scrollY > 40);
+}, { passive: true });
 
 // On a phone each section's label sticks to the top while its section is in view (style.css); once
 // it has reached the top it's .stuck, and gets the strip of paper the text slides under.

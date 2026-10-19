@@ -649,34 +649,43 @@ function name(s) {
 addEventListener('resize', () => { if (scene?.built) stack(scene); });
 
 // ---------- the Explore button ----------
-// Its edge is drawn in ink squares, each with its soft burn, like the graphics. As the page opens they
-// blip in one by one, from the top's middle round both ways; then they breathe together, slowly, like
-// the orb, while a swell circles round them like a satellite on its orbit, and now and then they knock
-// twice, pushing out, to say it's there to be pressed. Under the mouse they're drawn toward it a
-// little, and pressed, they draw in. (The CSS makes it float.)
+// Its edge is made like the orb's rim: a loose band of ink squares round its outline, each with its
+// own size and ink and its soft burn, two deep here and there, and a few strays drifting just outside
+// it. As the page opens they blip in at random, as the orb's do; then the edge breathes, slowly, each
+// square drifting a little on its own, and now and then a ripple runs along it both ways from one
+// point, as over the orb where a square lands, to say it's there to be pressed. Under the mouse the
+// squares are drawn toward it a little, and pressed, they draw in. (The CSS makes it float.)
 
 const EDGE = {
-  gap: 6.5,        // px between squares along the edge
-  size: 2.4,       // a square's side, px
+  gap: 4.2,        // px between squares along the outline, on average
+  size: 2.3,       // a square's side, px, on average
+  band: 1.4,       // px a square strays in or out of the outline, at most
+  deep: 0.35,      // the share of places where the band is two squares deep
+  strays: 12,      // squares drifting just outside the edge
   start: 0.9,      // s after the page opens before they blip in
-  stagger: 0.022,  // s between one square blipping in and the next
-  blip: 0.4,       // s a square takes to blip in
-  breath: 5,       // s for a breath
-  orbit: 7,        // s for the swell to go round once
-  beckon: 5,       // s between its knocks: now and then its squares push out twice, like knocking
+  spread: 1.3,     // s over which they blip in, at random
+  blip: 0.35,      // s a square takes to blip in
+  breath: 6,       // s for a breath
+  ripple: 6.5,     // s between ripples (the first a while after the edge is whole)
+  rippleSpeed: 70, // px a second it runs along the edge
   reach: 30,       // px around the mouse within which squares are drawn to it
   pull: 0.3,       // how far toward it, at most (a share of the way)
 };
-const OUT = 12;    // px the canvas reaches past the button, for the burns (as in the CSS)
+const OUT = 16;    // px the canvas reaches past the button, for the strays and burns (as in the CSS)
+const TAU = Math.PI * 2;
 
 const edge = document.createElement('canvas');
 const pen = edge.getContext('2d');
 const ink = getComputedStyle(root).getPropertyValue('--ink').trim() || '#11100f';
-let dots = [];     // the squares: { x, y (px, on the button's edge), u (0..1 round it), order (to blip in) }
+let dots = [];     // the edge's squares: { d (px along the outline), off (px out of it), size, ink, phase, born }
+let strays = [];   // the strays: { d, off, speed (px a second along the edge), phase, size }
 let w = 0, h = 0, dpr = 1;
 let hover = 0, hoverTo = 0, press = 0, pressTo = 0;
 const mouse = { x: 0, y: 0 };
 let frame = 0;     // the animation frame asked for, if any
+
+// A repeatable random number for square i (and k), so laying the edge out again keeps it as it was.
+const rnd = (i, k = 0) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
 
 // A burn, drawn once and stamped under each square: a soft umber glow.
 const burn = document.createElement('canvas');
@@ -692,64 +701,114 @@ burn.width = burn.height = 32;
   }
 }
 
-// Lays the squares out along the button's edge: evenly on each side, a square on every corner.
+// The point d px along the button's outline (clockwise from its top-left corner), and the way out of it.
+function outline(d) {
+  const p = 2 * (w + h);
+  d = ((d % p) + p) % p;
+  if (d < w) return [d, 0, 0, -1];
+  if ((d -= w) < h) return [w, d, 1, 0];
+  if ((d -= h) < w) return [w - d, h, 0, 1];
+  return [0, h - (d - w), -1, 0];
+}
+
+// Lays the squares out round the button's outline: not quite evenly, each its own, a little deeper
+// here and there; and the strays beyond it.
 function layout() {
   w = explore.offsetWidth;
   h = explore.offsetHeight;
   dpr = Math.min(devicePixelRatio || 1, 2);
   edge.width = Math.round((w + 2 * OUT) * dpr);
   edge.height = Math.round((h + 2 * OUT) * dpr);
-  const nx = Math.max(2, Math.round(w / EDGE.gap)), ny = Math.max(2, Math.round(h / EDGE.gap)), ring = [];
-  for (let k = 0; k < nx; k++) ring.push([w * k / nx, 0]);
-  for (let k = 0; k < ny; k++) ring.push([w, h * k / ny]);
-  for (let k = 0; k < nx; k++) ring.push([w - w * k / nx, h]);
-  for (let k = 0; k < ny; k++) ring.push([0, h - h * k / ny]);
-  const top = Math.floor(nx / 2), n = ring.length;
-  dots = ring.map((_, i) => {
-    const [x, y] = ring[(i + top) % n];
-    return { x, y, u: i / n, order: Math.min(i, n - i) };
-  });
+  const p = 2 * (w + h), n = Math.round(p / EDGE.gap);
+  dots = [];
+  for (let i = 0; i < n; i++) {
+    const d = ((i + rnd(i, 1) * 0.7) * p) / n;
+    const layers = rnd(i, 2) < EDGE.deep ? 2 : 1;
+    for (let k = 0; k < layers; k++) {
+      const j = i * 2 + k;
+      dots.push({
+        d,
+        off: (rnd(j, 3) * 2 - 1) * EDGE.band + (k ? (rnd(j, 4) < 0.5 ? -2.6 : 2.6) : 0),
+        size: 0.65 + rnd(j, 5) * 0.7,
+        ink: 0.5 + rnd(j, 6) * 0.5,
+        phase: rnd(j, 7) * TAU,
+        born: rnd(j, 8),
+      });
+    }
+  }
+  strays = Array.from({ length: EDGE.strays }, (_, i) => ({
+    d: rnd(i, 9) * p,
+    off: 4 + rnd(i, 10) * 7,
+    speed: (rnd(i, 11) - 0.5) * 6,
+    phase: rnd(i, 12) * TAU,
+    size: 0.5 + rnd(i, 13) * 0.4,
+  }));
   draw(performance.now());
 }
 
 const easeOutBack = (x) => 1 + 2.4 * (x - 1) ** 3 + 1.4 * (x - 1) ** 2;
 
+// Stamps a square of side s at (x, y), with its burn.
+function stamp(x, y, s) {
+  pen.drawImage(burn, x - s * 2.2, y - s * 2.2, s * 4.4, s * 4.4);
+  pen.fillRect(x - s / 2, y - s / 2, s, s);
+}
+
+// Draws a square at (x, y) as the mouse and a press move it: drawn toward the mouse, and in when pressed.
+function moved(x, y) {
+  if (hover > 0.01) {
+    const dx = mouse.x - x, dy = mouse.y - y;
+    const k = hover * EDGE.pull * Math.exp(-(dx * dx + dy * dy) / (2 * EDGE.reach ** 2));
+    x += dx * k;
+    y += dy * k;
+  }
+  return [x + (w / 2 - x) * 0.03 * press, y + (h / 2 - y) * 0.1 * press];
+}
+
 function draw(now) {
   frame = 0;
-  const still = reducedMotion.matches, t = now / 1000, opened = t - EDGE.start;
+  const still = reducedMotion.matches, t = now / 1000, opened = t - EDGE.start, p = 2 * (w + h);
   hover += (hoverTo - hover) * 0.12;
   press += (pressTo - press) * 0.3;
   pen.setTransform(dpr, 0, 0, dpr, OUT * dpr, OUT * dpr);
   pen.clearRect(-OUT, -OUT, w + 2 * OUT, h + 2 * OUT);
   pen.fillStyle = ink;
-  const breath = still ? 0.5 : 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / EDGE.breath);
-  const swell = (t / EDGE.orbit) % 1;
-  const q = (t - EDGE.start - 2.5) % EDGE.beckon;   // (negative until a while after they've blipped in)
-  const knock = still || q < 0 ? 0 : Math.exp(-((q / 0.08) ** 2)) + 0.7 * Math.exp(-(((q - 0.28) / 0.08) ** 2));
+  const breath = still ? 0 : 0.5 - 0.5 * Math.cos((t * TAU) / EDGE.breath);
+  // This ripple: where on the edge it starts, how far it has run each way, and how much is left of it.
+  const since = opened - EDGE.spread - 1.5, n = Math.floor(since / EDGE.ripple), rt = since - n * EDGE.ripple;
+  const origin = rnd(n, 14) * p, front = rt * EDGE.rippleSpeed;
+  const strength = still || since < 0 ? 0 : Math.exp(-rt / 1.6);
   let settling = false;
-  dots.forEach((d, i) => {
-    const age = still ? 1 : (opened - d.order * EDGE.stagger) / EDGE.blip;
+  for (const dot of dots) {
+    const age = still ? 1 : (opened - dot.born * EDGE.spread) / EDGE.blip;
     if (age < 1) settling = true;
-    if (age <= 0) return;
-    const behind = (((swell - d.u) % 1) + 1) % 1;   // how far round the swell has gone past it
-    const wake = still ? 0 : Math.exp(-behind * dots.length / 5);
-    const shimmer = still ? 0 : 0.08 * Math.sin(t * 1.7 + i * 2.39);
-    let x = d.x, y = d.y;
-    if (hover > 0.01) {   // drawn toward the mouse
-      const dx = mouse.x - x, dy = mouse.y - y;
-      const k = hover * EDGE.pull * Math.exp(-(dx * dx + dy * dy) / (2 * EDGE.reach ** 2));
-      x += dx * k;
-      y += dy * k;
-    }
-    x += (w / 2 - x) * 0.03 * press;   // pressed: drawn in
-    y += (h / 2 - y) * 0.1 * press;
-    x += (x - w / 2) * 0.035 * knock;   // knocking: out
-    y += (y - h / 2) * 0.09 * knock;
-    const s = EDGE.size * (age < 1 ? easeOutBack(age) : 1) * (0.85 + 0.25 * breath + shimmer + 0.8 * wake + 0.5 * knock) * (1 + 0.2 * hover);
-    pen.globalAlpha = Math.min(1, 0.6 + 0.25 * breath + 0.4 * wake) * Math.min(1, age * 3);
-    pen.drawImage(burn, x - s * 2.2, y - s * 2.2, s * 4.4, s * 4.4);
-    pen.fillRect(x - s / 2, y - s / 2, s, s);
-  });
+    if (age <= 0) continue;
+    let along = Math.abs(dot.d - origin);
+    along = Math.min(along, p - along);
+    const wave = strength * Math.exp(-(((along - front) / 9) ** 2));
+    const [bx, by, nx, ny] = outline(dot.d), out = dot.off + 1.1 * breath + 2.6 * wave;
+    const [x, y] = moved(
+      bx + nx * out + (still ? 0 : 0.6 * Math.sin(t * 0.8 + dot.phase)),
+      by + ny * out + (still ? 0 : 0.6 * Math.cos(t * 0.65 + dot.phase * 1.3)),
+    );
+    const s = EDGE.size * dot.size * (age < 1 ? easeOutBack(age) : 1) * (0.92 + 0.12 * breath + 0.5 * wave) * (1 + 0.2 * hover);
+    pen.globalAlpha = Math.min(1, dot.ink * (0.8 + 0.2 * breath) + 0.35 * wave) * Math.min(1, age * 3);
+    stamp(x, y, s);
+  }
+  // The strays come once the edge is whole, drifting along it and out and back, fading in and out.
+  const come = still ? 1 : Math.min(1, Math.max(0, (opened - EDGE.spread) / 1.5));
+  for (const st of strays) {
+    const [bx, by] = outline(st.d + (still ? 0 : st.speed * t));
+    // Out from the button's middle (squashed to its shape), so they round its corners smoothly.
+    let ox = (bx - w / 2) / w, oy = (by - h / 2) / h;
+    const l = Math.hypot(ox, oy) || 1;
+    ox /= l;
+    oy /= l;
+    const off = st.off + (still ? 0 : 1.5 * Math.sin(t * 0.7 + st.phase));
+    const [x, y] = moved(bx + ox * off, by + oy * off);
+    pen.globalAlpha = 0.45 * come * (still ? 0.7 : 0.5 + 0.5 * Math.sin(t * 0.5 + st.phase));
+    stamp(x, y, EDGE.size * st.size);
+  }
   pen.globalAlpha = 1;
   if (!still || settling || Math.abs(hover - hoverTo) > 0.01) ask();
 }

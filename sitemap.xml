@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The site is one page, the CV. (projects.html only redirects to its projects, and isn't listed.) -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://laufrandsen.dk/</loc>
+    <lastmod>2026-10-19</lastmod>
+  </url>
+</urlset>
