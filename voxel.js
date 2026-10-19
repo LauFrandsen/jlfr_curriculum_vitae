@@ -664,6 +664,7 @@ const RIDE = {
   narrow: 1.4,  // ... or in this many screen heights' worth of its width, if less (a phone held upright)
   crisp: 0.13,  // how much bigger the solid square's share of its sprite gets (near squares stay crisp)
   home: 0.3,    // flying back, the page comes back once the flight is this far from done
+  stay: 30,     // seconds at least, back from a ride, before the rotation moves on to the next graphic
   near: 0.03,   // the near plane (stage units)
   largest: 0.05,   // the largest a square's sprite may get while riding, in screen heights
 };
@@ -728,6 +729,8 @@ export function riding(on, middle) {
   if (!shown || (on ? 1 : 0) === rideTo) return;
   rideTo = on ? 1 : 0;
   if (reducedMotion.matches) ride = rideTo;
+  // Back from a ride, the graphic stays a while before the rotation moves on.
+  if (!on && rotation) rotation.since = Math.min(rotation.since, rotation.every - RIDE.stay);
   rideGraphic().riding?.(on);
   if (on) document.documentElement.classList.add('riding');   // (frame() takes it off once nearly back)
 }
@@ -1000,8 +1003,9 @@ function frame(nowMs) {
   adaptQuality(rawDt);
 
   // Rotation: after `every` seconds of the page on screen, morph into the next graphic (fetched a
-  // little ahead, so it's ready).
-  if (rotation && !morph && !reducedMotion.matches) {
+  // little ahead, so it's ready). Not while the camera rides along with this one (the tour), or is on
+  // its way there or back.
+  if (rotation && !morph && !reducedMotion.matches && !rideTo && ride === 0) {
     rotation.since += dt;
     if (rotation.since > rotation.every - 10) rotation.upcoming ??= rotation.next();
     if (rotation.since >= rotation.every) next();
