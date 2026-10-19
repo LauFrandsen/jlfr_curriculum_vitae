@@ -630,16 +630,20 @@ function place() {
   radius *= 1 + 0.1 * 4 * f * (1 - f);
   dim += (focusPose.brightness - dim) * f;
 
+  // Riding along (the tour, which may start from anywhere on the page): full strength, whatever it
+  // was at rest.
+  dim += (1 - dim) * view.ride;
+
   // The horizon's clip line comes down from the top of the screen as the graphic settles, and lifts
-  // while it glides up to a project pane.
-  clipY = at.clip * recede * (1 - f) * canvas.height;
+  // while it glides up to a project pane, or the camera flies off to ride along.
+  clipY = at.clip * recede * (1 - f) * (1 - view.ride) * canvas.height;
   const settled = at.clip > 0 && recede > 0.999;
   if (settled !== horizon) {
     horizon = settled;
     document.documentElement.classList.toggle('horizon', horizon);
   }
   if (paperFadeEl) {
-    const opacity = at.clip > 0 ? recede.toFixed(3) : '0';
+    const opacity = at.clip > 0 ? (recede * (1 - view.ride)).toFixed(3) : '0';
     if (paperFadeEl.style.opacity !== opacity) paperFadeEl.style.opacity = opacity;
   }
 }
@@ -662,7 +666,8 @@ const RIDE = {
   back: 2.8,    // seconds to fly back
   focal: 0.62, // the ride's focal length, in screen heights (lower = a wider view), ...
   narrow: 1.4,  // ... or in this many screen heights' worth of its width, if less (a phone held upright)
-  crisp: 0.13,  // how much bigger the solid square's share of its sprite gets (near squares stay crisp)
+  crisp: 0.24,  // how much bigger the solid square's share of its sprite gets (squares stay crisp), ...
+  soften: 0.45, // ... and how much fainter the burn around it
   home: 0.3,    // flying back, the page comes back once the flight is this far from done
   stay: 30,     // seconds at least, back from a ride, before the rotation moves on to the next graphic
   near: 0.03,   // the near plane (stage units)
@@ -963,7 +968,7 @@ function setShared(config, fade, other = config, k = 0) {
   set('uPullGlow', mix('pullGlow'));
   set('uDotSize', mix('dotSize'));
   set('uSquare', mix('squareSize') + RIDE.crisp * view.ride);
-  set('uBurn', mix('burn'));
+  set('uBurn', mix('burn') * (1 - RIDE.soften * view.ride));
   set('uBurnColor', mix3('burnColor'));
   set('uColor', mix3('color'));
   set('uLanding', mix('landing'));

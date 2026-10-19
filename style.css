@@ -22,6 +22,7 @@
 html {
   background: var(--bg);
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;   /* the ride hides the scrollbar: the page mustn't shift when it does */
   -webkit-text-size-adjust: 100%;
 }
 
@@ -295,6 +296,14 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   pointer-events: none;
 }
 .explore-button svg { animation: cue 2.6s ease-in-out infinite; }
+@media (hover: none) {   /* no hover to show the line over it: it shows for a while as the page opens */
+  .js .explore-hint { animation: hint 7s 2.6s both; }
+}
+@keyframes hint {
+  0% { opacity: 0; translate: -50% 6px; }
+  8%, 88% { opacity: 1; translate: -50% 0; }
+  100% { opacity: 0; translate: -50% 0; }
+}
 @media (hover: hover) {
   .explore-button:hover { translate: 0 -3px; background-color: rgba(250, 248, 243, 0.85); }
 }
@@ -324,8 +333,8 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .explore:has(.explore-button:focus-visible) .explore-hint { opacity: 1; translate: -50% 0; }
 
 @keyframes cue {
-  0%, 100% { transform: translateY(-1px); opacity: 0.6; }
-  50% { transform: translateY(3px); opacity: 1; }
+  0%, 100% { transform: translateX(-1px); opacity: 0.6; }
+  50% { transform: translateX(3px); opacity: 1; }
 }
 
 /* Callouts (callouts.js): a square of the graphic turns --signal (the graphic draws that) and a line
@@ -427,6 +436,44 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   transition: opacity 0.4s, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .tour[hidden] { display: none; }
+@media (max-width: 719px) {   /* a phone: up off the bottom edge, in easier reach of the thumb */
+  .tour { bottom: calc(max(var(--gutter), env(safe-area-inset-bottom)) + 20px); }
+  .tour .tour-steps button { min-height: 46px; padding: 0.5rem 1.1rem; }
+  html.touring .sound-button { bottom: calc(max(var(--gutter), env(safe-area-inset-bottom)) + 20px); }
+}
+.sound-button { transition: background-color 0.2s, color 0.2s, border-color 0.2s, bottom 0.4s; }
+
+/* The tour, for whoever has scrolled on past Explore: a small window left of the sound button, there
+   once the page is scrolled (tour.js), not on the tour. */
+.tour-button {
+  position: fixed;
+  right: calc(max(var(--gutter), env(safe-area-inset-right)) + 48px);
+  bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  z-index: 3;
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  height: 40px;
+  padding: 0 0.75rem 0 0.9rem;
+  border: 1px solid var(--line-strong);
+  background: rgba(250, 248, 243, 0.6);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0;
+  translate: 0 8px;
+  pointer-events: none;
+  transition: opacity 0.4s, translate 0.4s, background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+.js .tour-button { display: inline-flex; }
+.tour-button.shown { opacity: 1; translate: none; pointer-events: auto; }
+html.touring .tour-button { opacity: 0; pointer-events: none; }
+@media (hover: hover) {
+  .tour-button:hover { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+}
 .tour.away, html.focusing .tour { opacity: 0; transform: translateY(16px); pointer-events: none; }
 
 @media (min-width: 720px) {
@@ -494,6 +541,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .tour-stop[aria-current]::before { box-shadow: 0 0 6px 2px color-mix(in srgb, var(--burn) 40%, transparent); }
 .tour-steps { display: flex; gap: 0.4rem; }
 .tour-steps button {
+  min-height: 40px;
   padding: 0.5rem 0.85rem;
   border: 1px solid var(--line-strong);
   background: transparent;
@@ -974,6 +1022,39 @@ html.focusing .cv, html.focusing .hero { opacity: 0.12; transition: opacity 0.5s
    the graphic, under the bar; they slide up into place as their line reaches them. */
 .ride { position: fixed; inset: 0; z-index: 2; pointer-events: none; transition: opacity 0.4s; }
 .ride[hidden] { display: none; }
+.ride-heading {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 3.5vh);
+  left: 16px;
+  right: 16px;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.15rem, 5.6vw, 2.3rem);
+  font-weight: 300;
+  line-height: 1.25;
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 0 14px var(--bg), 0 0 4px var(--bg);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.ride.wide .ride-heading { right: auto; text-align: left; }
+.ride-heading.shown { opacity: 1; }
+.ride-word { display: inline-block; white-space: nowrap; }
+.ride-letter { display: inline-block; opacity: 0; }
+.ride-fly {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  background: var(--signal);
+  box-shadow: 0 0 6px 1px rgba(107, 75, 161, 0.45);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
 html.focusing .ride { opacity: 0; }
 .ride svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .ride-line { fill: none; stroke: var(--signal); stroke-width: 1; transition: opacity 0.3s; }
@@ -1151,7 +1232,7 @@ html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { poi
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .tour, .callout, .callout-box, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .tour, .tour-button, .callout, .callout-box, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }
