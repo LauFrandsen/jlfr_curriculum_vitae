@@ -546,8 +546,10 @@ export function evenOrder(items, at) {
 // fixed, invisible #voxel-rest (its --rest-brightness sets how faint the graphic gets behind the CV).
 // On narrower screens #voxel-rest sits on the bottom edge as a horizon: its --horizon-clip (a share
 // of the screen height) hides clipped squares above that line, a copy of the paper (#paper-fade)
-// fades the text out just above it, and once settled the graphic is lifted above the text
-// (html.horizon) so the text can't run over it. During a morph the rest position moves from the old
+// fades the text out just above it, and the graphic is lifted above the text (html.horizon) so the
+// text can't run over it. It's lifted as soon as it starts gliding down, while the fade is still clear
+// and nothing lies over it in the hero: lifted only once settled, it slid under the fade on the way
+// and popped back over it at the end. During a morph the rest position moves from the old
 // graphic's to the new one's.
 let dpr = 1, maxDpr = 2, cx = 0, cy = 0, radius = 100;
 const hero = { x: 0, y: 0, r: 100 };
@@ -560,7 +562,7 @@ let focusTarget = 0;  // 1 while something (e.g. a project pane) has the graphic
 let focus = 0;        // eased towards focusTarget
 let dim = 1;          // brightness multiplier from scrolling and focus
 let clipY = 0;        // device px from the top: clipped squares above it fade out
-let horizon = false;  // the graphic has settled on the horizon and sits above the text
+let horizon = false;  // the graphic is gliding down to the horizon, or on it, and sits above the text
 
 // The canvas's own CSS size at the last layout. frame() re-runs layout() as soon as it changes: a
 // phone's address bar can resize this fixed layer mid-scroll without a timely resize event.
@@ -637,9 +639,9 @@ function place() {
   // The horizon's clip line comes down from the top of the screen as the graphic settles, and lifts
   // while it glides up to a project pane, or the camera flies off to ride along.
   clipY = at.clip * recede * (1 - f) * (1 - view.ride) * canvas.height;
-  const settled = at.clip > 0 && recede > 0.999;
-  if (settled !== horizon) {
-    horizon = settled;
+  const lifted = at.clip > 0 && recede > 0.01;
+  if (lifted !== horizon) {
+    horizon = lifted;
     document.documentElement.classList.toggle('horizon', horizon);
   }
   if (paperFadeEl) {

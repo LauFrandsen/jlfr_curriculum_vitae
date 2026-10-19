@@ -551,12 +551,19 @@ function tick(now) {
 }
 
 // Goes to stop i on the ride: the last stop's windows go, the satellite speeds on (not on arriving
-// from the flight up), and the stop's own come.
+// from the flight up), forward to a later stop and back to an earlier one, and the stop's own come.
+// It only goes back as far as it has come forward, so the orbits never run back past the ride's start.
+let cruised = 0;   // cruises forward not yet undone by one back
 function visit(i) {
-  const arriving = !scene;
+  const arriving = !scene, from = scene?.stop;
   leave();
   scene = { stop: i, start: performance.now(), cruise: arriving ? 0 : WALK.cruise, items: [], hover: -1, open: -1 };
-  if (!arriving) ridePace(WALK.fast);
+  if (arriving) cruised = 0;
+  else {
+    const reverse = i < from && cruised > 0;
+    cruised += reverse ? -1 : 1;
+    ridePace(reverse ? -WALK.fast : WALK.fast);
+  }
   if (!ticking) ticking = requestAnimationFrame(tick);
 }
 

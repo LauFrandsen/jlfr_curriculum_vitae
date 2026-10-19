@@ -133,7 +133,7 @@ html[data-graphic="flower"] .paper-fade {
 }
 
 /* The horizon's fade: a copy of the paper, shown only along the bottom, laid over the text but
-   under the graphic. voxel.js fades it in as the graphic settles and lifts it above the text (.horizon). */
+   under the graphic. voxel.js fades it in as the graphic glides down, lifting the graphic above the text and the fade (.horizon). */
 .paper-fade {
   position: fixed;
   inset: 0;
@@ -188,7 +188,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 }
 
 .voxel-slot {
-  width: min(68vw, 52svh, 520px);   /* svh, not dvh: stays put while a phone's address bar hides */
+  width: min(68vw, 52svh, 520px, 100svh - 24rem);   /* svh, not dvh: stays put while a phone's address bar hides; on a short screen it shrinks, so the hero still fits with Explore in it */
   aspect-ratio: 1;
 }
 
@@ -238,8 +238,9 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 /* Explore: a window at the bottom of the hero that starts the guided tour (tour.js). It's made like
    the graphics: tour.js draws its edge in ink squares, each with its soft burn. It hovers over the
    paper, rising and sinking slowly, its scorch below it fading as it rises, and lifts a little more
-   under the mouse; its arrow nudges down. Over it, a line about the tour shows on hover or keyboard
-   focus (only with JS, which runs the tour). It all fades once the page is scrolled. */
+   under the mouse; its arrow nudges down. Under it, a line about the tour shows on hover or keyboard
+   focus (only with JS, which runs the tour), in place of See more, which steps aside meanwhile (over
+   Explore, it ran into the name and links on a short screen). It all fades once the page is scrolled. */
 .explore {
   position: absolute;
   left: 50%;
@@ -326,13 +327,18 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   pointer-events: none;
 }
 .explore-button svg { animation: cue 2.6s ease-in-out infinite; }
-@media (hover: none) and (min-height: 700px) {   /* no hover to show the line over it: it shows for a while as the page opens (where there's room over Explore) */
+@media (hover: none) and (min-height: 700px) {   /* no hover to show the line under it: it shows for a while as the page opens */
   .js .explore-hint { animation: hint 7s 2.6s both; }
+  .js .scroll-cue { animation: make-way 7s 2.6s; }
 }
 @keyframes hint {
-  0% { opacity: 0; translate: -50% 6px; }
+  0% { opacity: 0; translate: -50% -6px; }
   8%, 88% { opacity: 1; translate: -50% 0; }
   100% { opacity: 0; translate: -50% 0; }
+}
+@keyframes make-way {
+  0%, 100% { opacity: 1; }
+  8%, 88% { opacity: 0; }
 }
 @media (hover: hover) {
   .explore-button:hover { translate: 0 -3px; background-color: rgba(250, 248, 243, 0.85); }
@@ -341,11 +347,11 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .explore-hint {
   position: absolute;
   left: 50%;
-  bottom: 100%;
+  top: 100%;
   display: none;
   width: max-content;
   max-width: min(23rem, 100vw - 2 * var(--gutter));
-  margin: 0 0 0.9rem;
+  margin: 0.2rem 0 0;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 0.7rem;
@@ -354,13 +360,15 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   text-align: center;
   text-wrap: balance;
   opacity: 0;
-  translate: -50% 6px;
+  translate: -50% -6px;
   pointer-events: none;
   transition: opacity 0.4s, translate 0.4s;
 }
 .js .explore-hint { display: block; }
 .explore:has(.explore-button:hover) .explore-hint,
 .explore:has(.explore-button:focus-visible) .explore-hint { opacity: 1; translate: -50% 0; }
+.js .hero:has(.explore-button:hover) .scroll-cue,
+.js .hero:has(.explore-button:focus-visible) .scroll-cue { opacity: 0; }
 
 @keyframes cue {
   0%, 100% { transform: translateX(-1px); opacity: 0.6; }
