@@ -139,7 +139,10 @@ const launchTime = (k) => launches[k];
 // introBlipSeconds, each at its own moment and more and more of them toward the end; after `hold` the
 // core opens out over introExpandSeconds, each square up to `spread` late, overshooting a little
 // (`overshoot`) and settling into the orb. The orbits, breathing and flow wait until it's over.
-const INTRO = { delay: 0.3, hold: 0, spread: 0.15, overshoot: 1.2 };   // (no hold: the core opens on the last pop, with its sound)
+// delay: the orb waits this long before its squares start popping in, whether sound is on or not,
+// giving the visitor time to touch the page (which is what lets the browser start its sound).
+// No hold: the core opens on the last pop, with its sound.
+const INTRO = { delay: 1.8, hold: 0, spread: 0.15, overshoot: 1.2 };
 const introEnd = () => INTRO.delay + CONFIG.introBlipSeconds + INTRO.hold + CONFIG.introExpandSeconds + INTRO.spread;
 // The core's size at intro time x (the shader's, without each square's own lag).
 function introScale(x) {

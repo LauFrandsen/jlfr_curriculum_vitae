@@ -3,9 +3,9 @@
 //     thuds, low hums, soft knocks, breaths of noise, all in C major;
 //   - music: calm and bright, a little sci-fi, made as it plays and never the same twice (see "the
 //     music"). It opens with a motif and builds out from it.
-// It's off until the visitor turns it on, which is remembered for their next visit. Browsers keep a
-// page silent until the visitor taps, clicks or presses a key, so sound starts at the first of those
-// once it's on.
+// It's on unless the visitor has turned it off, which is remembered for their next visit. Browsers
+// keep a page silent until the visitor taps, clicks or presses a key, so sound starts at the first of
+// those.
 //
 // play(name, options) plays one of SOUNDS. Options: at (seconds from now), pan (-1 left .. 1 right),
 // gain (multiplies its loudness), pitch (multiplies its frequencies), length (seconds, for an effect
@@ -31,8 +31,8 @@ const MAX_VOICES = 48;   // effects playing at once; any more are skipped
 const NOTES = [110, 130.81, 146.83, 164.81, 196, 220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25];
 const note = (lo, hi) => NOTES[lo + Math.floor(Math.random() * (hi - lo + 1))];
 
-let on = false;
-try { on = localStorage.getItem('sound') === 'on'; } catch { /* no storage: off */ }
+let on = true;
+try { on = localStorage.getItem('sound') !== 'off'; } catch { /* no storage: on */ }
 
 let ctx = null;            // the audio context, made at the first gesture with sound on
 let master, fx, mix, room; // overall level, the effects' level, the mix they go into, their room
@@ -397,8 +397,8 @@ export const SOUNDS = {
     hum(s, { at: 0.48, freqs: [130.81, 196], cutoff: 250, to: 700, glide: 0.5, attack: 0.25, decay: 1.2, gain: 0.02 }),
     tone(s, { at: 1.3, type: 'triangle', freq: 329.63, attack: 0.004, decay: 0.12, gain: 0.03 }),
   ),
-  // Sound turned on (again: the first time, the music opens with it): the music's motif.
-  on: (s) => motif(s.t + 0.3) - s.t,
+  // The music's motif on its own (the music opens with it; the replay button plays it again).
+  motif: (s) => motif(s.t + 0.3) - s.t,
 };
 
 // ---------- the radio ----------
@@ -921,9 +921,6 @@ function synthNote(out, t, freqs, length, o = {}) {
   return end;
 }
 
-// How long the motif takes from being asked for (sound turned on) to its last note's end, in seconds.
-export const MOTIF_SECONDS = 0.3 + MUSIC.first + MUSIC.gap + MUSIC.second;
-
 // The motif from time t: its first note, a silence, and the second, a little brighter; dry, through
 // a ping-pong echo, and in a room of its own. Returns when the second note ends.
 function motif(t) {
@@ -1057,17 +1054,13 @@ for (const type of ['pointerdown', 'pointerup', 'keydown', 'touchend', 'click'])
 
 export const soundOn = () => on;
 
-// Turns sound on or off and remembers it. Call it from a click or tap, so the browser lets it start.
-// Turned off, it fades out quickly before the audio stops.
+// Turns sound on or off and remembers it: just that, the music carrying on where it was. Call it from
+// a click or tap, so the browser lets it start. Turned off, it fades out quickly before the audio stops.
 export function setSound(next) {
   on = !!next;
   try { localStorage.setItem('sound', on ? 'on' : 'off'); } catch { /* not remembered */ }
   if (on) {
-    // The motif greets it, as the music opens (or on its own, if the music was already playing).
-    wake().then((started) => {
-      levels(true);
-      if (!started) play('on');
-    });
+    wake().then(() => levels(true));
   } else if (ctx) {
     master.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
     setTimeout(() => { if (!on) ctx.suspend(); }, 400);

@@ -40,15 +40,15 @@
   <!-- Each file is loaded under the site's version (set by tools/version.mjs when publishing), so a
        browser never mixes cached files from one publish with fresh ones from the next. -->
   <script type="importmap">{"imports": {
-    "./voxel.js": "./voxel.js?v=a9058bef01",
-    "./tune.js": "./tune.js?v=a9058bef01",
-    "./sound.js": "./sound.js?v=a9058bef01",
-    "./callouts.js": "./callouts.js?v=a9058bef01",
-    "./tour.js": "./tour.js?v=a9058bef01",
-    "./graphics/orb.js": "./graphics/orb.js?v=a9058bef01",
-    "./graphics/flower.js": "./graphics/flower.js?v=a9058bef01"
+    "./voxel.js": "./voxel.js?v=aa602dd1f4",
+    "./tune.js": "./tune.js?v=aa602dd1f4",
+    "./sound.js": "./sound.js?v=aa602dd1f4",
+    "./callouts.js": "./callouts.js?v=aa602dd1f4",
+    "./tour.js": "./tour.js?v=aa602dd1f4",
+    "./graphics/orb.js": "./graphics/orb.js?v=aa602dd1f4",
+    "./graphics/flower.js": "./graphics/flower.js?v=aa602dd1f4"
   }}</script>
-  <link rel="stylesheet" href="style.css?v=a9058bef01">
+  <link rel="stylesheet" href="style.css?v=aa602dd1f4">
   <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
@@ -92,7 +92,19 @@
     </a>
   </header>
 
-  <!-- Sound: off until it's pressed (sound.js, page.js). -->
+  <!-- The hero's corner (page.js): just symbols, quiet. The graphics to choose from (filled in by
+       page.js), opened by the chevron; and under it Replay, the orb's opening again. -->
+  <div class="corner" id="corner">
+    <ul class="graphic-menu" id="graphic-menu" aria-label="Graphics"></ul>
+    <button class="corner-icon graphic-toggle" id="graphic-toggle" type="button" aria-expanded="false" aria-controls="graphic-menu" aria-label="Choose the graphic" title="Graphics">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M7 14.5l5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="corner-icon replay" id="replay" type="button" aria-label="Replay the opening" title="Replay">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M5.5 12a6.5 6.5 0 1 0 1.9-4.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 3.8v3.9h3.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <!-- Sound: on unless it has been turned off (sound.js, page.js). -->
   <button class="sound-button" id="sound-button" type="button" aria-label="Sound" aria-pressed="false" title="Turn sound on">
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
       <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>
@@ -369,6 +381,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="page.js?v=a9058bef01"></script>
+  <script type="module" src="page.js?v=aa602dd1f4"></script>
 </body>
 </html>

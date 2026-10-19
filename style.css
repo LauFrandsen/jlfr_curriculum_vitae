@@ -446,6 +446,58 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 .js .sound-button { display: grid; }
+
+/* The hero's lower left corner (page.js): not proper buttons, just symbols, faint until the mouse
+   finds them. From the bottom up: Replay (the orb's opening again; only for the orb, the graphic with
+   an opening), a chevron, and over it, once the chevron is pressed (it turns over), a symbol for each
+   graphic to morph into, the one shown in full ink. It all fades with Explore once the page is
+   scrolled, or while the tour or a project pane is up. Choosing needs the graphic drawn (WebGL). */
+.corner {
+  position: fixed;
+  left: max(calc(var(--gutter) - 8px), env(safe-area-inset-left));
+  bottom: max(var(--gutter), env(safe-area-inset-bottom));
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.4s;
+}
+.js .corner { display: flex; }
+.corner.hidden, html.touring .corner, html.focusing .corner { opacity: 0; pointer-events: none; }
+.corner-icon, .graphic-menu button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.3s, color 0.2s;
+}
+.corner-icon:focus-visible, .graphic-menu button:focus-visible { opacity: 1; outline: 1px solid var(--ink); outline-offset: -4px; }
+@media (hover: hover) {
+  .corner-icon:hover, .graphic-menu button:hover { opacity: 1; color: var(--ink); }
+}
+.replay { display: none; }
+html[data-graphic="orb"] .replay { display: grid; }
+html.no-webgl .graphic-toggle, html.no-webgl .graphic-menu { display: none; }
+.graphic-toggle svg { transition: rotate 0.3s; }
+.graphic-toggle[aria-expanded="true"] svg { rotate: 180deg; }
+.graphic-menu {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  visibility: hidden;
+  opacity: 0;
+  translate: 0 6px;
+  transition: opacity 0.25s, translate 0.25s, visibility 0s 0.25s;
+}
+.corner.open .graphic-menu { visibility: visible; opacity: 1; translate: 0 0; transition: opacity 0.25s, translate 0.25s; }
+.graphic-menu button[aria-current="true"] { opacity: 1; color: var(--ink); }
 .sound-button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
 .sound-button[aria-pressed="true"] .sound-mute,
 .sound-button[aria-pressed="false"] .sound-waves { display: none; }
@@ -1272,7 +1324,7 @@ html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { poi
   }
   html, body { background: #fff !important; }
   body { font-size: 9.5pt; line-height: 1.45; color: var(--text); }
-  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .tour, .tour-button, .callout, .callout-box, .print-hide, .tune-panel,
+  .void, .voxel-halo, #voxel-canvas, .paper-fade, .voxel-rest, .voxel-focus, .hero, .pdf-button, .sound-button, .corner, .tour, .tour-button, .callout, .callout-box, .print-hide, .tune-panel,
   .project-hint, .project-dialog { display: none !important; }
   .project-more { display: block; }
   .project { padding: 0; border: 0; margin-bottom: 0.9rem; break-inside: avoid; }

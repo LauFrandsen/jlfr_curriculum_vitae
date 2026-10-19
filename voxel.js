@@ -923,6 +923,18 @@ export function morphTo(g) {
   play('morph', { pan: panOf(), length: MORPH.seconds });
 }
 
+// Morphs into graphic g now, as the visitor chose it (and the rotation starts its wait over, so it
+// stays a while). Says whether it will: not while a morph is under way, or without the graphic drawn.
+export function choose(g) {
+  if (!gl || !shown || morph || g === shown.graphic) return false;
+  if (rotation) {
+    rotation.since = 0;
+    rotation.upcoming = null;
+  }
+  morphTo(g);
+  return true;
+}
+
 // Morphs into the next graphic of the rotation now.
 export async function next() {
   if (!rotation || morph || rotation.loading) return;
