@@ -1,16 +1,17 @@
 # Jonas Biune Frandsen: CV
 
-> Senior AI Engineer at Heyra, Copenhagen, Denmark. Designing and building AI and ML systems
-> end-to-end, from problem to prototype to production.
+> Jonas Biune Frandsen: Senior AI Engineer in Copenhagen. Agentic AI, machine learning and data science, from problem to prototype to production.
 
-The CV at https://laufrandsen.dk/, as plain markdown. Last updated June 2026.
-
-- Email: color@laufrandsen.dk
-- LinkedIn: https://www.linkedin.com/in/biunefrandsen
-- Phone: +45 41 66 77 26
-- Location: Copenhagen, Denmark
+The CV at https://laufrandsen.dk/, as plain markdown, made from the page itself. CV last updated June 2026.
 
 ## About
+
+Senior AI Engineer at [Heyra](https://heyra.ai/)
+
+- [color@laufrandsen.dk](mailto:color@laufrandsen.dk)
+- [LinkedIn](https://www.linkedin.com/in/biunefrandsen)
+- [+45 41 66 77 26](tel:+4541667726)
+- Copenhagen, Denmark
 
 Designing and building AI and ML systems end-to-end, from problem to prototype to production. I build both purely agentic flows and traditional ML wrapped in agents, delivering the real AI experience: chat with your data and get predictive insights from the same system.
 
@@ -24,7 +25,7 @@ Specialised in: Agentic AI, Machine Learning, Data Science, Team-leading, Softwa
 
 ## Experience & education
 
-### Senior AI Engineer: Heyra (2026 – now)
+### Senior AI Engineer: Heyra · 2026 – now
 
 - Designing and building AI and ML systems end-to-end at scale, taking ideas from problem to prototype to production for clients' businesses
 - Building both purely agentic flows and traditional ML wrapped in agents, delivering the real AI experience: chat with your data and get predictive insights from the same system
@@ -33,7 +34,7 @@ Specialised in: Agentic AI, Machine Learning, Data Science, Team-leading, Softwa
 - Laying the data foundations that keep AI and ML systems reliable in production
 - Spec-driven development and agentic coding workflows, moving from a clear spec to shipped AI and ML fast
 
-### Senior Data Science Consultant: Netcompany (2026)
+### Senior Data Science Consultant: Netcompany · 2026
 
 - Data Consultant working solely on AI / ML projects
 - Core role at AI-Rejseholdet, which specialises in PoCs and rapid prototyping
@@ -45,7 +46,7 @@ Specialised in: Agentic AI, Machine Learning, Data Science, Team-leading, Softwa
 - Strong experience in LLM evaluation: designing and running evals for correctness, reliability and quality
 - Using Claude Code for feature building (not for data analysis or production code, for security reasons)
 
-### Data Consultant: Netcompany (2023 – 2025)
+### Data Consultant: Netcompany · 2023 – 2025
 
 - Project and team lead on a DSB x Netcompany project on AI predictions for train travel
 - Working with clients to implement data-driven solutions using ML and AI
@@ -53,20 +54,20 @@ Specialised in: Agentic AI, Machine Learning, Data Science, Team-leading, Softwa
 - Developing and deploying scalable AI models using Databricks and cloud technologies
 - Helping clients with statistical analysis and data visualization
 
-### Master's degree in Software Design: IT University of Copenhagen (2021 – 2023, education)
+### Master's degree in Software Design: IT University of Copenhagen · 2021 – 2023 · Education
 
 - Specialisation in AI and deep learning
 - Electives in Big Data Management and Applied Information Security
 - Thesis: Searching for open-ended properties in a Large Scale Collective Intelligence system
 - GPA: 10.13
 
-### Bachelor's degree in Film and Media Sciences: University of Copenhagen (2018 – 2021, education)
+### Bachelor's degree in Film and Media Sciences: University of Copenhagen · 2018 – 2021 · Education
 
 - GPA: 10.50
 
 ## Projects
 
-### AI-Rejseholdet: Netcompany (2025 – 2026)
+### AI-Rejseholdet: Netcompany · 2025 – 2026
 
 Specialist team delivering rapid AI/ML proofs of concept to demonstrate business value potential.
 
@@ -77,7 +78,7 @@ Specialist team delivering rapid AI/ML proofs of concept to demonstrate business
 
 Technologies: Python, Databricks, MLflow, Azure, Rapid Prototyping.
 
-### DSB AI predictions for trains: DSB x Netcompany (Dec 2023 – 2025)
+### DSB AI predictions for trains: DSB x Netcompany · Dec 2023 – 2025
 
 Led the transformation of a Proof of Concept into an enterprise-scale ML system delivering real-time train predictions across Denmark.
 
@@ -127,3 +128,9 @@ Technologies: Python, Databricks, MLflow, Azure, PySpark.
 ## Beyond work
 
 Ten years of Dungeons & Dragons with the same party, and as much hiking and sleeping outdoors as the calendar allows. Fully committed on both fronts.
+
+## Contact
+
+- [color@laufrandsen.dk](mailto:color@laufrandsen.dk)
+- [LinkedIn](https://www.linkedin.com/in/biunefrandsen)
+- [+45 41 66 77 26](tel:+4541667726)
