@@ -14,15 +14,15 @@
   <!-- Each file is loaded under the site's version (set by tools/version.mjs when publishing), so a
        browser never mixes cached files from one publish with fresh ones from the next. -->
   <script type="importmap">{"imports": {
-    "./voxel.js": "./voxel.js?v=e5794ed3ab",
-    "./tune.js": "./tune.js?v=e5794ed3ab",
-    "./sound.js": "./sound.js?v=e5794ed3ab",
-    "./callouts.js": "./callouts.js?v=e5794ed3ab",
-    "./tour.js": "./tour.js?v=e5794ed3ab",
-    "./graphics/orb.js": "./graphics/orb.js?v=e5794ed3ab",
-    "./graphics/flower.js": "./graphics/flower.js?v=e5794ed3ab"
+    "./voxel.js": "./voxel.js?v=59207583ce",
+    "./tune.js": "./tune.js?v=59207583ce",
+    "./sound.js": "./sound.js?v=59207583ce",
+    "./callouts.js": "./callouts.js?v=59207583ce",
+    "./tour.js": "./tour.js?v=59207583ce",
+    "./graphics/orb.js": "./graphics/orb.js?v=59207583ce",
+    "./graphics/flower.js": "./graphics/flower.js?v=59207583ce"
   }}</script>
-  <link rel="stylesheet" href="style.css?v=e5794ed3ab">
+  <link rel="stylesheet" href="style.css?v=59207583ce">
   <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
@@ -54,7 +54,7 @@
       <div class="explore-float">
         <a class="explore-button" id="explore-button" href="#about" aria-describedby="explore-hint">
           Explore
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
       </div>
       <span class="explore-shadow" aria-hidden="true"></span>
@@ -68,6 +68,12 @@
       <path class="sound-waves" d="M15.5 9.2a4 4 0 0 1 0 5.6M18 6.6a7.6 7.6 0 0 1 0 10.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       <path class="sound-mute" d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>
+  </button>
+
+  <!-- The tour, for whoever has scrolled on past Explore: a small window by the sound button (tour.js). -->
+  <button class="tour-button" id="tour-button" type="button" title="Take the guided tour" aria-label="Take the guided tour">
+    Tour
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 
   <!-- The guided tour (tour.js): a bar along the bottom that takes the visitor through the CV, stop by
@@ -88,13 +94,13 @@
 
   <main class="cv">
     <!-- An introduction for the guided tour only: its first stop when it's a ride (tour.js); hidden on the
-         page. Each paragraph is a window: data-kind is its small line, data-note the one beside it, and a
-         <strong> its title. -->
+         page. Each paragraph is a window: data-kind is its small line, data-note the one beside it, a
+         <strong> its title, the rest its text, and data-chips (split at " · ") a row of tags. -->
     <section id="hello" class="tour-only" data-tour-title="Hello" data-tour="A little about me first." hidden>
       <p data-kind="Hello" data-note="Copenhagen, Denmark"><strong>I'm Jonas</strong></p>
-      <p>I started out studying film and media, then moved into software design and AI. Today I build AI and ML systems at Heyra, from the first idea all the way to production.</p>
-      <p>I do my best work close to people: listening to what they actually need, and building things that solve real problems rather than technical gimmicks.</p>
-      <p>Outside work I'm usually out on a trail, or around a Dungeons &amp; Dragons table with the same party I've played with for ten years.</p>
+      <p>I studied film and media before a master's in software design, where I specialised in AI and deep learning. Since then I've led the team that took train predictions for DSB from a proof of concept to all of Denmark, and today I build AI and ML systems at Heyra.</p>
+      <p>I do my best work close to people: listening to what they actually need, explaining complex things plainly, and building what solves real problems rather than technical gimmicks.</p>
+      <p data-kind="In short" data-chips="Copenhagen · Danish and English · From film studies to AI · Team and project lead · Proactive"></p>
     </section>
 
     <section id="about" class="intro reveal" data-tour-title="About" data-tour="Who I am and what I do, in short.">
@@ -332,6 +338,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="page.js?v=e5794ed3ab"></script>
+  <script type="module" src="page.js?v=59207583ce"></script>
 </body>
 </html>

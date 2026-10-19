@@ -630,16 +630,20 @@ function place() {
   radius *= 1 + 0.1 * 4 * f * (1 - f);
   dim += (focusPose.brightness - dim) * f;
 
+  // Riding along (the tour, which may start from anywhere on the page): full strength, whatever it
+  // was at rest.
+  dim += (1 - dim) * view.ride;
+
   // The horizon's clip line comes down from the top of the screen as the graphic settles, and lifts
-  // while it glides up to a project pane.
-  clipY = at.clip * recede * (1 - f) * canvas.height;
+  // while it glides up to a project pane, or the camera flies off to ride along.
+  clipY = at.clip * recede * (1 - f) * (1 - view.ride) * canvas.height;
   const settled = at.clip > 0 && recede > 0.999;
   if (settled !== horizon) {
     horizon = settled;
     document.documentElement.classList.toggle('horizon', horizon);
   }
   if (paperFadeEl) {
-    const opacity = at.clip > 0 ? recede.toFixed(3) : '0';
+    const opacity = at.clip > 0 ? (recede * (1 - view.ride)).toFixed(3) : '0';
     if (paperFadeEl.style.opacity !== opacity) paperFadeEl.style.opacity = opacity;
   }
 }
@@ -662,8 +666,10 @@ const RIDE = {
   back: 2.8,    // seconds to fly back
   focal: 0.62, // the ride's focal length, in screen heights (lower = a wider view), ...
   narrow: 1.4,  // ... or in this many screen heights' worth of its width, if less (a phone held upright)
-  crisp: 0.13,  // how much bigger the solid square's share of its sprite gets (near squares stay crisp)
+  crisp: 0.18,  // how much bigger the solid square's share of its sprite gets (a little crisper), ...
+  soften: 0.2,  // ... and how much fainter the burn around it (still soft)
   home: 0.3,    // flying back, the page comes back once the flight is this far from done
+  stay: 30,     // seconds at least, back from a ride, before the rotation moves on to the next graphic
   near: 0.03,   // the near plane (stage units)
   largest: 0.05,   // the largest a square's sprite may get while riding, in screen heights
 };
@@ -728,6 +734,13 @@ export function riding(on, middle) {
   if (!shown || (on ? 1 : 0) === rideTo) return;
   rideTo = on ? 1 : 0;
   if (reducedMotion.matches) ride = rideTo;
+  // The ride is seen close, so it starts at full sharpness (squares are cut first while riding).
+  if (on) {
+    resetQuality();
+    if (maxDpr < SHARP) setDpr(SHARP);
+  }
+  // Back from a ride, the graphic stays a while before the rotation moves on.
+  if (!on && rotation) rotation.since = Math.min(rotation.since, rotation.every - RIDE.stay);
   rideGraphic().riding?.(on);
   if (on) document.documentElement.classList.add('riding');   // (frame() takes it off once nearly back)
 }
@@ -960,7 +973,7 @@ function setShared(config, fade, other = config, k = 0) {
   set('uPullGlow', mix('pullGlow'));
   set('uDotSize', mix('dotSize'));
   set('uSquare', mix('squareSize') + RIDE.crisp * view.ride);
-  set('uBurn', mix('burn'));
+  set('uBurn', mix('burn') * (1 - RIDE.soften * view.ride));
   set('uBurnColor', mix3('burnColor'));
   set('uColor', mix3('color'));
   set('uLanding', mix('landing'));
@@ -1000,8 +1013,9 @@ function frame(nowMs) {
   adaptQuality(rawDt);
 
   // Rotation: after `every` seconds of the page on screen, morph into the next graphic (fetched a
-  // little ahead, so it's ready).
-  if (rotation && !morph && !reducedMotion.matches) {
+  // little ahead, so it's ready). Not while the camera rides along with this one (the tour), or is on
+  // its way there or back.
+  if (rotation && !morph && !reducedMotion.matches && !rideTo && ride === 0) {
     rotation.since += dt;
     if (rotation.since > rotation.every - 10) rotation.upcoming ??= rotation.next();
     if (rotation.since >= rotation.every) next();
@@ -1059,12 +1073,13 @@ function frame(nowMs) {
 // ---------- adaptive quality ----------
 // Judged in 2-second windows. Below ~45 fps: render at a slightly lower pixel ratio first (hardly
 // visible on a phone's dense screen, and the squares' burn makes every pixel count), then draw fewer
-// squares, then the lowest pixel ratio. Every cut is an experiment: if the next window isn't faster,
-// the device is frame-capped (e.g. battery saver at 30 fps) rather than overloaded, so the cut is
-// undone and adapting stops. When it runs smoothly again, quality comes back step by step in reverse,
-// never up to a step that proved too slow. The share of squares applies to every layer; layers order
-// their data evenly (evenOrder; graphics keep story squares first), so drawing only the first part
-// thins them evenly instead of leaving holes.
+// squares, then the lowest pixel ratio; while riding along (the tour, seen close up, where a lower
+// pixel ratio blurs), fewer squares first, and sharpness is the first to come back. Every cut is an
+// experiment: if the next window isn't faster, the device is frame-capped (e.g. battery saver at
+// 30 fps) rather than overloaded, so the cut is undone and adapting stops. When it runs smoothly
+// again, quality comes back step by step in reverse, never up to a step that proved too slow. The
+// share of squares applies to every layer; layers order their data evenly (evenOrder; graphics keep
+// story squares first), so drawing only the first part thins them evenly instead of leaving holes.
 
 let detail = 1;       // share of each layer's squares drawn
 let quality;
@@ -1118,10 +1133,11 @@ function adaptQuality(rawDt) {
     if (quality.justRaised === 'detail') quality.ceiling = detail;
     if (quality.justRaised === 'dpr') quality.dprCeiling = maxDpr;
     const before = { fps, detail, dpr: maxDpr };
-    if (effective(SOFT) < effective(maxDpr)) setDpr(SOFT);
-    else if (detail > minDetail) detail = Math.max(minDetail, detail * 0.75);
-    else if (effective(SOFTEST) < effective(maxDpr)) setDpr(SOFTEST);
-    else return;
+    const soft = () => effective(SOFT) < effective(maxDpr) && (setDpr(SOFT), true);
+    const fewer = () => detail > minDetail && ((detail = Math.max(minDetail, detail * 0.75)), true);
+    const softest = () => effective(SOFTEST) < effective(maxDpr) && (setDpr(SOFTEST), true);
+    // Riding, the scene is seen close up and blurs badly at a lower pixel ratio: fewer squares first.
+    if (!(rideTo ? fewer() || soft() || softest() : soft() || fewer() || softest())) return;
     quality.pending = before;
     quality.goodWindows = 0;
     quality.justRaised = null;
@@ -1132,16 +1148,11 @@ function adaptQuality(rawDt) {
   if (fps > 56 && ++quality.goodWindows >= 3) {
     quality.goodWindows = 0;
     const raised = Math.min(1, quality.ceiling * 0.99, detail * 1.15);
-    if (maxDpr < SOFT && quality.dprCeiling > SOFT) {
-      setDpr(SOFT);
-      quality.justRaised = 'dpr';
-    } else if (raised > detail) {
-      detail = raised;
-      quality.justRaised = 'detail';
-    } else if (maxDpr < SHARP && quality.dprCeiling > SHARP) {
-      setDpr(SHARP);
-      quality.justRaised = 'dpr';
-    }
+    const sharper = (cap) => maxDpr < cap && quality.dprCeiling > cap && (setDpr(cap), (quality.justRaised = 'dpr'), true);
+    const more = () => raised > detail && ((detail = raised), (quality.justRaised = 'detail'), true);
+    // Riding, sharpness comes back first.
+    if (rideTo) sharper(SOFT) || sharper(SHARP) || more();
+    else sharper(SOFT) || more() || sharper(SHARP);
   }
 }
 

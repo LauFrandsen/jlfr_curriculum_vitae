@@ -144,6 +144,15 @@ explore.addEventListener('click', (e) => {
   e.preventDefault();
   start(e.detail === 0);   // (a click from Enter has no count)
 });
+
+// The second way in, by the sound button: there once the page has scrolled on past Explore.
+const again = document.getElementById('tour-button');
+if (again) {
+  again.addEventListener('click', (e) => start(e.detail === 0));
+  const offer = () => again.classList.toggle('shown', scrollY > innerHeight * 0.6);
+  addEventListener('scroll', offer, { passive: true });
+  offer();
+}
 back.addEventListener('click', () => go(at - 1));
 next.addEventListener('click', () => (at === stops.length - 1 ? end() : go(at + 1)));
 bar.querySelector('.tour-end').addEventListener('click', end);
@@ -202,9 +211,14 @@ const SCENE = 0.42;   // on a narrow screen, the share of its height kept for th
 const LANES = 34;  // px kept free at the right edge of a narrow screen for the lines' lanes
 const GAP = 8;     // px between windows
 
+// The ride's screen, measured by its own layer (fixed, filling it): unlike the window's size, it stays
+// put while a phone's page is pinch-zoomed.
+const vw = () => layer.clientWidth || innerWidth;
+const vh = () => layer.clientHeight || innerHeight;
+
 // Where the ride's view has its middle (voxel.js riding): on a wide screen right of the windows'
 // column; on a narrow one high up, above their stack.
-const wide = () => innerWidth > innerHeight * 1.05;
+const wide = () => vw() > vh() * 1.05;
 const middle = () => (wide() ? [0.63, 0.44] : [0.5, 0.3]);
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -229,7 +243,13 @@ function itemsOf(el) {
   if (el.classList.contains('tour-only')) {
     return [...el.children].map((p) => {
       const strong = p.querySelector('strong');
-      return { kind: p.dataset.kind, title: textOf(strong), note: p.dataset.note, text: textOf(p).replace(textOf(strong), '').trim() };
+      return {
+        kind: p.dataset.kind,
+        title: textOf(strong),
+        note: p.dataset.note,
+        text: textOf(p).replace(textOf(strong), '').trim(),
+        chips: p.dataset.chips ? p.dataset.chips.split(' · ') : null,
+      };
     });
   }
   switch (el.id) {
@@ -315,9 +335,9 @@ function windowOf(item, toggled) {
       b.addEventListener('click', () => window.print());
     }
   }
-  const opens = !!item.open || !!item.more?.length || folds || (item.chips?.length ?? 0) > 3;
-  // A window of text alone opens too, but only while its text is cut short (stack() marks it clipped).
-  const clips = !opens && !!item.text;
+  const opens = !!item.open || !!item.more?.length || folds;
+  // A window of text or tags alone opens too, but only while they're cut short (stack() marks it clipped).
+  const clips = !opens && (!!item.text || !!item.chips?.length);
   if (clips) el.classList.add('clips');
   if (opens) {
     el.tabIndex = 0;
@@ -346,15 +366,15 @@ function windowOf(item, toggled) {
 // is, for its line. An open window stands alone where the stack ends, as tall as there's room for
 // (scrolling within, if it needs more), the others stepping aside.
 function stack(s) {
-  const barTop = bar.getBoundingClientRect().top || innerHeight;
-  const w = wide() ? Math.min(340, innerWidth * 0.3) : innerWidth - 32 - LANES;
-  const left = wide() ? Math.max(32, innerWidth * 0.04) : 16;
-  const room = wide() ? barTop - 48 : barTop - 12 - innerHeight * SCENE;
+  const barTop = bar.getBoundingClientRect().top || vh();
+  const w = wide() ? Math.min(340, vw() * 0.3) : vw() - 32 - LANES;
+  const left = wide() ? Math.max(32, vw() * 0.04) : 16;
+  const room = wide() ? barTop - 48 : barTop - 12 - vh() * SCENE;
   const cards = s.items.map((it) => it.card);
   for (const it of s.items) {
     const open = it.k === s.open;
     it.card.style.width = `${w}px`;
-    it.card.style.maxHeight = open ? `${wide() ? barTop - 48 : barTop - 12 - innerHeight * 0.2}px` : '';
+    it.card.style.maxHeight = open ? `${wide() ? barTop - 48 : barTop - 12 - vh() * 0.2}px` : '';
     it.card.classList.toggle('open', open);
     it.card.classList.toggle('aside', s.open >= 0 && !open);
     if (!it.item.open && it.card.getAttribute('role') && !it.card.classList.contains('clips')) it.card.setAttribute('aria-expanded', open);
@@ -366,7 +386,7 @@ function stack(s) {
   if (height(cards) > room) s.items.forEach((it) => it.card.classList.toggle('compact', it.k !== s.open));
   const place = (list) => {
     const h = height(list);
-    let y = Math.max(8, wide() ? Math.min((innerHeight - h) / 2 - 24, barTop - 24 - h) : barTop - 12 - h);
+    let y = Math.max(8, wide() ? Math.min((vh() - h) / 2 - 24, barTop - 24 - h) : barTop - 12 - h);
     const top = y;
     for (const c of list) {
       c.style.left = `${left}px`;
@@ -375,11 +395,11 @@ function stack(s) {
     }
     return top;
   };
-  // A window of text alone whose text is cut short can be opened to read it whole.
+  // A window of text or tags alone that's cut short can be opened to read it whole.
   for (const it of s.items) {
     if (!it.card.classList.contains('clips')) continue;
-    const p = it.card.querySelector('.ride-text'), open = it.k === s.open;
-    const can = open || p.scrollHeight > p.clientHeight + 1;
+    const p = it.card.querySelector('.ride-text'), ul = it.card.querySelector('.ride-chips'), open = it.k === s.open;
+    const can = open || (p && p.scrollHeight > p.clientHeight + 1) || (ul && ul.scrollWidth > ul.clientWidth + 1);
     it.card.classList.toggle('clipped', can && !open);
     if (can) {
       it.card.tabIndex = 0;
@@ -393,6 +413,8 @@ function stack(s) {
   }
   s.box = { left, w, top: place(cards) };
   if (s.open >= 0) place([s.items[s.open].card]);
+  layer.classList.toggle('wide', wide());
+  placeHeading(s);
   for (const it of s.items) it.rect = { x: left, y: parseFloat(it.card.style.top), w, h: it.card.offsetHeight };
 }
 
@@ -404,7 +426,7 @@ function stack(s) {
 function pick(s) {
   const all = marks();
   if (!all.length) return false;
-  const W = innerWidth, H = innerHeight, b = s.box, barTop = bar.getBoundingClientRect().top || H;
+  const W = vw(), H = vh(), b = s.box, barTop = bar.getBoundingClientRect().top || H;
   const room = wide()
     ? { x0: b.left + b.w + W * 0.05, x1: W - 40, y0: H * 0.12, y1: barTop - 30 }
     : { x0: W * 0.08, x1: W - 28 - LANES, y0: H * 0.22, y1: b.top - 20 };
@@ -445,7 +467,7 @@ function pick(s) {
 function lineOf(it, m) {
   const r = it.rect, y = r.y + Math.min(r.h / 2, 22);
   if (wide()) return `M${m.x},${m.y}L${r.x + r.w},${y}`;
-  const lane = innerWidth - 16 - LANES + 8 + it.k * 4;
+  const lane = vw() - 16 - LANES + 8 + it.k * 4;
   return `M${m.x},${m.y}L${lane},${m.y}L${lane},${y}L${r.x + r.w},${y}`;
 }
 
@@ -521,6 +543,10 @@ function tick(now) {
   }
   if (!s.built && t >= s.cruise + WALK.settle) build(s);
   if (s.built && s.t0 === undefined && (pick(s) || t > s.cruise + 6)) s.t0 = t;
+  if (s.t0 !== undefined && !s.named) {
+    s.named = true;
+    name(s);
+  }
   if (s.t0 !== undefined) light(s, t - s.t0);
 }
 
@@ -534,12 +560,14 @@ function visit(i) {
   if (!ticking) ticking = requestAnimationFrame(tick);
 }
 
-// The stop's squares go back to ink, and its windows and lines go.
+// The stop's squares go back to ink, and its windows, lines and name go.
 function leave() {
   const s = scene;
   scene = null;
   setMarks([]);
   walkPath.setAttribute('d', '');
+  heading.classList.remove('shown');
+  for (const f of s?.flies ?? []) f.remove();
   for (const it of s?.items ?? []) {
     it.card.classList.remove('shown');
     it.line.remove();
@@ -547,13 +575,85 @@ function leave() {
   }
 }
 
+// The stop's name, drawn out of its squares: once they light, a purple square flies up from them to
+// each letter of the name, big over the scene (above the column on a wide screen, at the top on a
+// narrow one), and turns into it. (The bar names the stop for screen readers.)
+const heading = document.createElement('p');
+heading.className = 'ride-heading';
+heading.setAttribute('aria-hidden', 'true');
+layer.append(heading);
+
+function placeHeading(s) {
+  if (!wide()) {
+    heading.style.left = heading.style.top = heading.style.width = '';
+    return;
+  }
+  heading.style.left = `${s.box.left}px`;
+  heading.style.width = `${Math.min(vw() * 0.45, s.box.w * 1.6)}px`;
+  heading.style.top = `${Math.max(20, s.box.top - heading.offsetHeight - 22)}px`;
+}
+
+function name(s) {
+  heading.replaceChildren();
+  const letters = [];
+  for (const word of stops[s.stop].title.split(/\s+/)) {
+    const w = document.createElement('span');
+    w.className = 'ride-word';
+    for (const ch of word) {
+      const l = document.createElement('span');
+      l.className = 'ride-letter';
+      l.textContent = ch;
+      w.append(l);
+      letters.push(l);
+    }
+    heading.append(w, ' ');
+  }
+  heading.classList.add('shown');
+  placeHeading(s);
+  const from = s.items.filter((it) => it.square >= 0);
+  s.flies = [];
+  letters.forEach((l, i) => {
+    const it = from.length ? from[i % from.length] : null;
+    const m = it ? markAt(it.square) : null;
+    const r = l.getBoundingClientRect(), to = [r.left + r.width / 2, r.top + r.height / 2];
+    const at = m?.front ? [m.x, m.y] : [to[0], to[1] + 60];
+    // ms from the first square lighting: after its own square has lit, one letter after another.
+    const delay = ((it ? it.k * WALK.stagger : 0) + 0.5) * 1000 + i * 40;
+    if (reducedMotion.matches) {
+      l.style.opacity = '1';
+      return;
+    }
+    const fly = document.createElement('span');
+    fly.className = 'ride-fly';
+    layer.append(fly);
+    s.flies.push(fly);
+    // Out along a slight bow, alternating sides.
+    const dx = to[0] - at[0], dy = to[1] - at[1], bow = (i % 2 ? 1 : -1) * 0.12;
+    const mid = [at[0] + dx * 0.5 - dy * bow, at[1] + dy * 0.5 + dx * bow];
+    const spot = ([x, y], k) => `translate(${x}px, ${y}px) scale(${k})`;
+    fly.animate([
+      { transform: spot(at, 1), opacity: 0 },
+      { transform: spot(at, 1.2), opacity: 1, offset: 0.1 },
+      { transform: spot(mid, 1.1), opacity: 1, offset: 0.5 },
+      { transform: spot(to, 1.6), opacity: 1, offset: 0.85 },
+      { transform: spot(to, 0.3), opacity: 0 },
+    ], { duration: 1000, delay, easing: 'cubic-bezier(0.45, 0, 0.25, 1)', fill: 'both' }).onfinish = () => fly.remove();
+    l.animate([
+      { opacity: 0, transform: 'scale(0.4)', color: 'var(--signal)' },
+      { opacity: 1, transform: 'none', color: 'var(--signal)', offset: 0.5 },
+      { opacity: 1, transform: 'none', color: 'var(--ink)' },
+    ], { duration: 900, delay: delay + 850, easing: 'ease-out', fill: 'both' });
+  });
+}
+
 addEventListener('resize', () => { if (scene?.built) stack(scene); });
 
 // ---------- the Explore button ----------
 // Its edge is drawn in ink squares, each with its soft burn, like the graphics. As the page opens they
 // blip in one by one, from the top's middle round both ways; then they breathe together, slowly, like
-// the orb, while a swell circles round them like a satellite on its orbit. Under the mouse they're
-// drawn toward it a little, and pressed, they draw in. (The CSS makes it float.)
+// the orb, while a swell circles round them like a satellite on its orbit, and now and then they knock
+// twice, pushing out, to say it's there to be pressed. Under the mouse they're drawn toward it a
+// little, and pressed, they draw in. (The CSS makes it float.)
 
 const EDGE = {
   gap: 6.5,        // px between squares along the edge
@@ -563,6 +663,7 @@ const EDGE = {
   blip: 0.4,       // s a square takes to blip in
   breath: 5,       // s for a breath
   orbit: 7,        // s for the swell to go round once
+  beckon: 5,       // s between its knocks: now and then its squares push out twice, like knocking
   reach: 30,       // px around the mouse within which squares are drawn to it
   pull: 0.3,       // how far toward it, at most (a share of the way)
 };
@@ -623,6 +724,8 @@ function draw(now) {
   pen.fillStyle = ink;
   const breath = still ? 0.5 : 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / EDGE.breath);
   const swell = (t / EDGE.orbit) % 1;
+  const q = (t - EDGE.start - 2.5) % EDGE.beckon;   // (negative until a while after they've blipped in)
+  const knock = still || q < 0 ? 0 : Math.exp(-((q / 0.08) ** 2)) + 0.7 * Math.exp(-(((q - 0.28) / 0.08) ** 2));
   let settling = false;
   dots.forEach((d, i) => {
     const age = still ? 1 : (opened - d.order * EDGE.stagger) / EDGE.blip;
@@ -640,7 +743,9 @@ function draw(now) {
     }
     x += (w / 2 - x) * 0.03 * press;   // pressed: drawn in
     y += (h / 2 - y) * 0.1 * press;
-    const s = EDGE.size * (age < 1 ? easeOutBack(age) : 1) * (0.85 + 0.25 * breath + shimmer + 0.8 * wake) * (1 + 0.2 * hover);
+    x += (x - w / 2) * 0.035 * knock;   // knocking: out
+    y += (y - h / 2) * 0.09 * knock;
+    const s = EDGE.size * (age < 1 ? easeOutBack(age) : 1) * (0.85 + 0.25 * breath + shimmer + 0.8 * wake + 0.5 * knock) * (1 + 0.2 * hover);
     pen.globalAlpha = Math.min(1, 0.6 + 0.25 * breath + 0.4 * wake) * Math.min(1, age * 3);
     pen.drawImage(burn, x - s * 2.2, y - s * 2.2, s * 4.4, s * 4.4);
     pen.fillRect(x - s / 2, y - s / 2, s, s);
