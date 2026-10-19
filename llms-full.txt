@@ -1,0 +1,129 @@
+# Jonas Biune Frandsen: CV
+
+> Senior AI Engineer at Heyra, Copenhagen, Denmark. Designing and building AI and ML systems
+> end-to-end, from problem to prototype to production.
+
+The CV at https://laufrandsen.dk/, as plain markdown. Last updated June 2026.
+
+- Email: color@laufrandsen.dk
+- LinkedIn: https://www.linkedin.com/in/biunefrandsen
+- Phone: +45 41 66 77 26
+- Location: Copenhagen, Denmark
+
+## About
+
+Designing and building AI and ML systems end-to-end, from problem to prototype to production. I build both purely agentic flows and traditional ML wrapped in agents, delivering the real AI experience: chat with your data and get predictive insights from the same system.
+
+Passionate and results-driven AI Engineer & Data Scientist with a solid background in software development. As both a Data Scientist and Team Lead on a DSB x Netcompany project, I took part in developing and implementing AI-driven predictions for Danish trains, a solution with customers in all of Denmark. That experience taught me to run Proof of Concept projects and scale them into machine learning solutions that deliver tangible business value through productionised models.
+
+I have worked with traditional ML such as predictive maintenance, data clustering, classifiers, time-series prediction and regression, as well as Deep Learning, where my expertise has been computer vision. I have strong experience with LLMs, including agentic workflows, document extraction and LLM evaluation.
+
+I thrive in collaborative teams, using a strong technical foundation and a versatile skill set to move projects forward. I'm proactive by nature, taking initiative so goals are met and obstacles are dealt with promptly.
+
+Specialised in: Agentic AI, Machine Learning, Data Science, Team-leading, Software Development, Data Visualization.
+
+## Experience & education
+
+### Senior AI Engineer: Heyra (2026 – now)
+
+- Designing and building AI and ML systems end-to-end at scale, taking ideas from problem to prototype to production for clients' businesses
+- Building both purely agentic flows and traditional ML wrapped in agents, delivering the real AI experience: chat with your data and get predictive insights from the same system
+- Trusted advisor on fast-moving AI technologies, making sure the AI we build delivers tangible business value rather than novelty
+- Focus on agentic workflows, machine learning, decision intelligence, document extraction and LLM evaluations
+- Laying the data foundations that keep AI and ML systems reliable in production
+- Spec-driven development and agentic coding workflows, moving from a clear spec to shipped AI and ML fast
+
+### Senior Data Science Consultant: Netcompany (2026)
+
+- Data Consultant working solely on AI / ML projects
+- Core role at AI-Rejseholdet, which specialises in PoCs and rapid prototyping
+- Responsible for the ML/AI tech stack, identifying high-impact areas for business transformation
+- Hypothesis-based work process to make sure the scientific proof is secured
+- Translating core business needs through an AI/ML lens to ensure bottom-line value
+- Extensive work with LLMs, including agentic workflows and agent frameworks (LangChain, PydanticAI, MCP)
+- Document extraction using language models, and observability with Langfuse
+- Strong experience in LLM evaluation: designing and running evals for correctness, reliability and quality
+- Using Claude Code for feature building (not for data analysis or production code, for security reasons)
+
+### Data Consultant: Netcompany (2023 – 2025)
+
+- Project and team lead on a DSB x Netcompany project on AI predictions for train travel
+- Working with clients to implement data-driven solutions using ML and AI
+- Leading and implementing Proof of Concept projects that assess the potential for larger ML and AI implementations
+- Developing and deploying scalable AI models using Databricks and cloud technologies
+- Helping clients with statistical analysis and data visualization
+
+### Master's degree in Software Design: IT University of Copenhagen (2021 – 2023, education)
+
+- Specialisation in AI and deep learning
+- Electives in Big Data Management and Applied Information Security
+- Thesis: Searching for open-ended properties in a Large Scale Collective Intelligence system
+- GPA: 10.13
+
+### Bachelor's degree in Film and Media Sciences: University of Copenhagen (2018 – 2021, education)
+
+- GPA: 10.50
+
+## Projects
+
+### AI-Rejseholdet: Netcompany (2025 – 2026)
+
+Specialist team delivering rapid AI/ML proofs of concept to demonstrate business value potential.
+
+- Part of a 4-person specialist team executing rapid proofs of concept at clients to demonstrate how ML and AI can impact their business
+- Responsible for the ML/AI tech stack, identifying high-impact areas where ML or AI could drive lasting business transformation
+- Rapid prototyping to validate ML hypotheses and demonstrate signal for scalable solutions
+- Translating core business needs through an AI/ML lens so implementations deliver tangible bottom-line value
+
+Technologies: Python, Databricks, MLflow, Azure, Rapid Prototyping.
+
+### DSB AI predictions for trains: DSB x Netcompany (Dec 2023 – 2025)
+
+Led the transformation of a Proof of Concept into an enterprise-scale ML system delivering real-time train predictions across Denmark.
+
+- Architected and deployed a network of production models that improved customer satisfaction and operational efficiency
+- Progressed from team member to team lead and ultimately project lead, ensuring continuous business value delivery
+- Balanced technical implementation with strategic vision, translating complex AI solutions into tangible business outcomes
+
+Technologies: Python, Databricks, MLflow, Azure, PySpark.
+
+## Technical skills
+
+- LLMs & AI agents: LangChain, LlamaIndex, PydanticAI, MCP, RAG, Vector Databases, Prompt Engineering, Few-shot Prompting, Structured Output, Fine-tuning, Synthetic Data Generation, Langfuse, RAGAS, Human-in-the-loop Evaluation, Document Extraction, Claude Code. Experience with all major frontier AI lab APIs (OpenAI, Anthropic, Google, Meta).
+- Data science & ML: Deep Learning, Traditional ML, Neuroevolution, Statistical Analysis, MLflow.
+- Programming: Python, Java, SQL. Very strong Python background, for both low-level and high-level programming.
+- Cloud & MLOps: Databricks, Cloud deployment of AI models, MLOps, ModelMesh, AI health monitoring, Azure virtual machines.
+- Big data: PySpark, Hadoop File System (HFS), High-Performance Computing with Ray.
+- Systems & security: Linux, Windows, macOS (operating systems); Information security fundamentals.
+
+## Personal skills
+
+### Team leadership
+
+- Experience as Team Lead, motivating and coordinating teams
+- Experience as Project Lead, with an understanding of project planning, team management and successful deliveries
+
+### Communication
+
+- Strong stakeholder management skills
+- Adept at conveying complex technical topics to non-technical audiences
+- Presenting complex matters to medium and large audiences in an understandable way
+
+### Business-to-solution thinking
+
+- Translating stakeholder conversations and business needs into concrete, valuable data solutions
+- Impact over novelty: listening to customers and stakeholders to build solutions that solve real problems, not technical gimmicks
+
+### Problem-solving & adaptability
+
+- Analytical thinker who quickly learns and applies new technologies and methods
+- Highly flexible when project requirements, technologies or the organisation around a project change
+
+### Languages
+
+- Danish: native
+- English: fluent
+
+## Beyond work
+
+Ten years of Dungeons & Dragons with the same party, and as much hiking and sleeping outdoors as the calendar allows. Fully committed on both fronts.

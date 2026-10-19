@@ -11,6 +11,32 @@
   <meta property="og:title" content="Jonas Biune Frandsen · Senior AI Engineer">
   <meta property="og:description" content="Enabling your data. Agentic AI, machine learning and data science, from problem to prototype to production.">
   <meta property="og:url" content="https://laufrandsen.dk/">
+  <!-- Who this page is about, for search engines and AI agents (schema.org). Agents also have a guide
+       in llms.txt and the whole CV as markdown in llms-full.txt. -->
+  <script type="application/ld+json">{
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "url": "https://laufrandsen.dk/",
+    "dateModified": "2026-10-19",
+    "mainEntity": {
+      "@type": "Person",
+      "name": "Jonas Biune Frandsen",
+      "jobTitle": "Senior AI Engineer",
+      "worksFor": { "@type": "Organization", "name": "Heyra", "url": "https://heyra.ai/" },
+      "address": { "@type": "PostalAddress", "addressLocality": "Copenhagen", "addressCountry": "DK" },
+      "email": "mailto:color@laufrandsen.dk",
+      "telephone": "+45 41 66 77 26",
+      "url": "https://laufrandsen.dk/",
+      "sameAs": ["https://www.linkedin.com/in/biunefrandsen"],
+      "alumniOf": [
+        { "@type": "CollegeOrUniversity", "name": "IT University of Copenhagen" },
+        { "@type": "CollegeOrUniversity", "name": "University of Copenhagen" }
+      ],
+      "knowsLanguage": ["da", "en"],
+      "knowsAbout": ["Agentic AI", "Machine Learning", "Data Science", "LLM evaluation", "Document extraction", "MLOps", "Data Visualization"]
+    }
+  }</script>
+  <link rel="alternate" type="text/markdown" href="/llms-full.txt" title="The CV as markdown">
   <!-- Each file is loaded under the site's version (set by tools/version.mjs when publishing), so a
        browser never mixes cached files from one publish with fresh ones from the next. -->
   <script type="importmap">{"imports": {
