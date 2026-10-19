@@ -1,0 +1,6 @@
+# laufrandsen.dk: Jonas Biune Frandsen's CV. Every crawler and agent is welcome, search engines and
+# AI agents alike: the whole CV is plain text in the page's HTML.
+User-agent: *
+Allow: /
+
+Sitemap: https://laufrandsen.dk/sitemap.xml
