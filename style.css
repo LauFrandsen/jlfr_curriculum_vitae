@@ -181,8 +181,9 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(3rem, 11svh, 7rem);
+  gap: clamp(2.5rem, 8svh, 6rem);
   padding: var(--gutter);
+  padding-top: calc(var(--gutter) + 3svh);   /* the graphic is drawn a little past its slot: room over it */
   /* Room for Explore and See more, and clear of the links above: Explore's ink edge reaches 16px out
      from it, and it floats up 6px (and 3px more under the mouse). */
   padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 9.7rem);
@@ -190,7 +191,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 }
 
 .voxel-slot {
-  width: min(68vw, 52svh, 520px, 100svh - 26.5rem);   /* svh, not dvh: stays put while a phone's address bar hides; on a short screen it shrinks, so the hero still fits with Explore in it */
+  width: min(68vw, 52svh, 520px, 97svh - 26.5rem);   /* svh, not dvh: stays put while a phone's address bar hides; on a short screen it shrinks, so the hero still fits with Explore in it */
   aspect-ratio: 1;
 }
 
