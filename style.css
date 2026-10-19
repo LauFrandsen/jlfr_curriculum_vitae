@@ -183,7 +183,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
   justify-content: center;
   gap: clamp(3rem, 11svh, 7rem);
   padding: var(--gutter);
-  padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 6.5rem);   /* room for Explore */
+  padding-bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 7.6rem);   /* room for Explore and See more */
   pointer-events: none;   /* taps and hovers reach the canvas underneath */
 }
 
@@ -243,7 +243,7 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .explore {
   position: absolute;
   left: 50%;
-  bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 0.25rem);
+  bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 2.2rem);
   translate: -50% 0;
   display: grid;
   justify-items: center;
@@ -251,6 +251,36 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 }
 .explore.hidden { opacity: 0; }
 .explore.hidden .explore-button { pointer-events: none; }
+
+/* "…or see more": under Explore, a small line with an arrow nudging down, for scrolling on at one's
+   own pace; a tap scrolls down to the CV. It fades with Explore once the page is scrolled. */
+.scroll-cue {
+  position: absolute;
+  left: 50%;
+  bottom: max(0.5rem, env(safe-area-inset-bottom));
+  translate: -50% 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  padding: 0.25rem 0.75rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-decoration: none;
+  pointer-events: auto;   /* the rest of the hero lets pointers through to the graphic */
+  transition: opacity 0.4s, color 0.2s;
+}
+.scroll-cue svg { animation: fall 2.6s ease-in-out infinite; }
+.scroll-cue.hidden { opacity: 0; pointer-events: none; }
+@media (hover: hover) {
+  .scroll-cue:hover { color: var(--ink); }
+}
+@keyframes fall {
+  0%, 100% { transform: translateY(-1px); opacity: 0.6; }
+  50% { transform: translateY(4px); opacity: 1; }
+}
 
 .explore-float { animation: float 6s ease-in-out infinite; }
 .explore-shadow {
@@ -290,13 +320,13 @@ html.horizon #voxel-canvas { z-index: 2; pointer-events: none; }
 .explore-button.drawn { border-color: transparent; }
 .explore-button canvas {
   position: absolute;
-  inset: -12px;
-  width: calc(100% + 24px);
-  height: calc(100% + 24px);
+  inset: -16px;
+  width: calc(100% + 32px);
+  height: calc(100% + 32px);
   pointer-events: none;
 }
 .explore-button svg { animation: cue 2.6s ease-in-out infinite; }
-@media (hover: none) {   /* no hover to show the line over it: it shows for a while as the page opens */
+@media (hover: none) and (min-height: 700px) {   /* no hover to show the line over it: it shows for a while as the page opens (where there's room over Explore) */
   .js .explore-hint { animation: hint 7s 2.6s both; }
 }
 @keyframes hint {
@@ -1155,7 +1185,7 @@ html.riding .cv, html.riding .cv *, html.riding .hero, html.riding .hero * { poi
 
 @media (prefers-reduced-motion: reduce) {
   .js .reveal { opacity: 1; transform: none; transition: none; }
-  .explore-button svg, .explore-float, .explore-shadow, .tl-marker { animation: none !important; }
+  .explore-button svg, .explore-float, .explore-shadow, .scroll-cue svg, .tl-marker { animation: none !important; }
   .project, .project-hint { transition: none; }
 }
 
